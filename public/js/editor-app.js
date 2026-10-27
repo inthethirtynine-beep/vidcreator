@@ -80,13 +80,14 @@ ed.syncMedia=(force=false)=>{
   const audio=ed.project.audio,local=pt.source-pt.range.cut.start,remaining=pt.range.cut.end-pt.source;
   const fade=Math.min(1,audio.fadeIn?local/audio.fadeIn:1,audio.fadeOut?remaining/audio.fadeOut:1);
   ed.video.muted=!ed.sound;ed.video.volume=EditorModel.clamp(audio.volume*fade,0,1);
+  ed.adVideo.muted=!ed.sound||ed.project.adConfig?.adAudio===false;
 };
 ed.tick=now=>{if(!ed.playing)return;const pt=ed.point();if(pt?.frozen||ed.video.readyState>=2&&!ed.video.seeking)ed.head+=Math.max(0,now-ed.lastTick)/1000;ed.lastTick=now;
   if(ed.head>=ed.duration){ed.head=Math.max(0,ed.duration-.001);ed.pause();ed.syncMedia(true);return;}
   ed.syncMedia();ed.paint();ed.updatePlayhead();ed.animation=requestAnimationFrame(ed.tick);
 };
 ed.togglePlay=()=>{if(!ed.project)return;if(ed.playing){ed.pause();return;}if(ed.head>=ed.duration-.05)ed.seek(0);ed.playing=true;ed.lastTick=performance.now();ed.syncMedia();ed.animation=requestAnimationFrame(ed.tick);ed.paint();};
-ed.toggleSound=()=>{ed.sound=!ed.sound;ed.video.muted=!ed.sound;uiSetIcon('ed-sound',ed.sound?"volume-up-fill":"volume-mute-fill");document.getElementById('ed-sound').setAttribute('aria-pressed',String(ed.sound));};
+ed.toggleSound=()=>{ed.sound=!ed.sound;ed.video.muted=!ed.sound;ed.adVideo.muted=!ed.sound||ed.project?.adConfig?.adAudio===false;uiSetIcon('ed-sound',ed.sound?"volume-up-fill":"volume-mute-fill");document.getElementById('ed-sound').setAttribute('aria-pressed',String(ed.sound));};
 ed.stepFrame=delta=>{ed.pause();ed.seek(ed.head+delta/30);};
 ed.fullscreen=()=>{const el=document.querySelector('.ed-player');if(document.fullscreenElement)document.exitFullscreen();else el.requestFullscreen().catch(ed.error);};
 ed.fitStage=()=>{

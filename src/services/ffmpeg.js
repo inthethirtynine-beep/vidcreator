@@ -224,7 +224,15 @@ function buildFilterComplex(template, videoInfo) {
  */
 async function renderClip(inputPath, outputPath, startTime, duration, template, onProgress, adEvents = []) {
   const hasHolds = adEvents.some(event => event.freeze);
-  const inputInfo = hasHolds ? await getVideoInfo(inputPath) : null;
+  // Video banners keep their own soundtrack (unless switched off); probe each file once.
+  const probes = new Map();
+  const adHasAudio = await Promise.all(adEvents.map(event => {
+    const file = event.asset?.filePath;
+    if (!event.asset?.animated || event.audio === false || !file || /\.gif$/i.test(file)) return false;
+    if (!probes.has(file)) probes.set(file, getVideoInfo(file).then(info => !!info.audioCodec).catch(() => false));
+    return probes.get(file);
+  }));
+  const inputInfo = hasHolds || adHasAudio.some(Boolean) ? await getVideoInfo(inputPath) : null;
   const finalDuration = outputDuration(duration, adEvents);
   return new Promise((resolve, reject) => {
     const textFiles = [];
@@ -308,12 +316,36 @@ async function renderClip(inputPath, outputPath, startTime, duration, template, 
       label = `advert${i}`;
     });
 
+    // Banner sound plays at the banner's output time, faded with its picture, over the
+    // clip audio (which is silent during a freeze, so the ad is heard on its own).
+    const adAudioLabels = [];
+    outputEvents(adEvents).forEach((event, i) => {
+      if (!adHasAudio[i]) return;
+      const input = i + (hasWatermark ? 2 : 1);
+      let adAudio = `[${input}:a]atrim=duration=${event.duration},asetpts=PTS-STARTPTS,aformat=sample_rates=48000:channel_layouts=stereo`;
+      if (event.fade > 0) adAudio += `,afade=t=in:st=0:d=${event.fade},afade=t=out:st=${Math.max(0, event.duration - event.fade)}:d=${event.fade}`;
+      finalFilter += `;${adAudio},adelay=${Math.round(event.start * 1000)}:all=1[adaudio${i}]`;
+      adAudioLabels.push(`[adaudio${i}]`);
+    });
+    let audioMap = frozen.audioLabel ? `[${frozen.audioLabel}]` : '0:a?';
+    if (adAudioLabels.length) {
+      let main = frozen.audioLabel;
+      if (!main) {
+        finalFilter += inputInfo?.audioCodec
+          ? `;[0:a]${audioFilters.length ? audioFilters.join(',') : 'anull'}[mainaudio]`
+          : `;anullsrc=r=48000:cl=stereo,atrim=duration=${finalDuration}[mainaudio]`;
+        main = 'mainaudio';
+      }
+      finalFilter += `;[${main}]aformat=sample_rates=48000:channel_layouts=stereo[mainstereo];[mainstereo]${adAudioLabels.join('')}amix=inputs=${adAudioLabels.length + 1}:duration=first:normalize=0[mixedaudio]`;
+      audioMap = '[mixedaudio]';
+    }
+
     args.push('-filter_complex', finalFilter);
     args.push('-map', `[${label}]`);
-    args.push('-map', frozen.audioLabel ? `[${frozen.audioLabel}]` : '0:a?');
+    args.push('-map', audioMap);
 
     // Audio filters
-    if (audioFilters.length > 0 && !frozen.audioLabel) {
+    if (audioFilters.length > 0 && audioMap === '0:a?') {
       args.push('-af', audioFilters.join(','));
     }
 

@@ -55,12 +55,19 @@ function showToast(message, type = 'info') {
     <span class="toast__message">${escapeHtml(message)}</span>
   `;
 
+  toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
   container.appendChild(toast);
+  // Keep the stack short: the oldest message leaves when a fourth one arrives.
+  const live = [...container.querySelectorAll('.toast:not(.toast--leaving)')];
+  if (live.length > 3) dismissToast(live[0]);
 
-  setTimeout(() => {
-    toast.style.animation = 'toastOut 0.3s ease forwards';
-    setTimeout(() => toast.remove(), 300);
-  }, 3000);
+  setTimeout(() => dismissToast(toast), type === 'error' ? 6000 : 3200);
+}
+
+function dismissToast(toast) {
+  if (!toast.isConnected || toast.classList.contains('toast--leaving')) return;
+  toast.classList.add('toast--leaving');
+  setTimeout(() => toast.remove(), 220);
 }
 
 // ============================================
@@ -75,7 +82,20 @@ function showConfirmModal(title, text, btnText, callback) {
   document.getElementById('confirm-modal-btn').textContent = btnText;
   document.getElementById('confirm-modal').classList.remove('hidden');
   confirmCallback = callback;
+  requestAnimationFrame(() => document.getElementById('confirm-modal-btn').focus());
 }
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !document.getElementById('confirm-modal').classList.contains('hidden')) {
+    e.preventDefault();
+    closeConfirmModal();
+  }
+  // Ctrl+S saves the open template instead of the browser saving the page.
+  if ((e.ctrlKey || e.metaKey) && e.code === 'KeyS' && state.currentPage === 'templates' && state.editingTemplate) {
+    e.preventDefault();
+    saveCurrentTemplate();
+  }
+});
 
 function closeConfirmModal() {
   document.getElementById('confirm-modal').classList.add('hidden');
@@ -395,38 +415,51 @@ function showVideoInfo(video) {
 function removeVideo() {
   showConfirmModal(
     'Удалить видео?',
-    'Загруженное видео будет удалено с сервера.',
+    'Файл исчезнет из библиотеки и с диска. Чтобы просто взять другое видео, нажми «Другое видео».',
     'Удалить',
     async () => {
       if (state.currentVideoId) {
         try {
-          const response = await fetch(`/api/videos/${state.currentVideoId}`, { method: 'DELETE' });
+          const id = state.currentVideoId;
+          const response = await fetch(`/api/videos/${id}`, { method: 'DELETE' });
           if (!response.ok) throw new Error((await response.json()).error);
+          const option = document.querySelector(`#source-library option[value="${id}"]`);
+          if (option) option.remove();
         } catch (e) { showToast(e.message,'error'); return; }
       }
-
-      state.currentVideoId = null;
-      state.currentVideoInfo = null;
-      if (typeof resetStudioSource === 'function') resetStudioSource();
-      state.currentVideoInfo = null;
-
-      document.getElementById('video-info-area').style.display = 'none';
-      document.getElementById('upload-progress-area').style.display = 'none';
-      document.getElementById('upload-area').style.display = 'block';
-      const switcher = document.querySelector('.import-switcher');
-      if (switcher) switcher.style.display = 'flex';
-      document.getElementById('upload-zone').style.display = 'block';
-      document.getElementById('video-input').value = '';
-      const ytUrl = document.getElementById('yt-url-input');
-      if (ytUrl) ytUrl.value = '';
-      const ytProg = document.getElementById('yt-progress-area');
-      if (ytProg) ytProg.style.display = 'none';
-
-      // Reset workflow
-      activateStep(1);
+      resetSourceView();
       showToast('Видео удалено', 'info');
     }
   );
+}
+
+// Back to the import screen without deleting anything; the file stays in the library.
+function changeSource() {
+  resetSourceView();
+  const library = document.getElementById('source-library');
+  if (library) library.value = '';
+}
+
+function resetSourceView() {
+  state.currentVideoId = null;
+  state.currentVideoInfo = null;
+  if (typeof resetStudioSource === 'function') resetStudioSource();
+  state.currentVideoInfo = null;
+
+  document.getElementById('video-info-area').style.display = 'none';
+  document.getElementById('upload-progress-area').style.display = 'none';
+  document.getElementById('upload-area').style.display = 'block';
+  const switcher = document.querySelector('.import-switcher');
+  if (switcher) switcher.style.display = 'flex';
+  document.getElementById('upload-zone').style.display = 'block';
+  document.getElementById('video-input').value = '';
+  const ytUrl = document.getElementById('yt-url-input');
+  if (ytUrl) ytUrl.value = '';
+  const ytProg = document.getElementById('yt-progress-area');
+  if (ytProg) ytProg.style.display = 'none';
+
+  // Reset workflow
+  activateStep(1);
 }
 
 // ============================================
@@ -530,7 +563,7 @@ async function selectTemplate(id) {
     document.getElementById('selected-template-info').style.display = 'block';
     document.getElementById('template-select-area').style.display = 'none';
 
-    showToast(`Шаблон "${template.name}" выбран`, 'success');
+    if (!state.restoringSession) showToast(`Шаблон «${template.name}» выбран`, 'success');
   } catch (err) {
     showToast('Ошибка: ' + err.message, 'error');
   }
@@ -557,8 +590,9 @@ async function createNewTemplate() {
       body: JSON.stringify({ name: 'Новый шаблон' }),
     });
     const template = await response.json();
-    showToast('Шаблон создан!', 'success');
     openTemplateEditor(template);
+    // A new template stays a draft until it is saved; leaving without saving removes it.
+    state.editingTemplateIsNew = true;
   } catch (err) {
     showToast('Ошибка: ' + err.message, 'error');
   }
@@ -576,6 +610,8 @@ async function editTemplate(id) {
 
 function openTemplateEditor(template) {
   state.editingTemplate = { ...template };
+  state.editingTemplateIsNew = false;
+  state.templateDirty = false;
 
   document.getElementById('templates-list-view').style.display = 'none';
   document.getElementById('template-editor-view').style.display = 'block';
@@ -628,7 +664,16 @@ function openTemplateEditor(template) {
   updatePreviewInfo();
 }
 
-function closeTemplateEditor() {
+function closeTemplateEditor(force = false) {
+  if (!force && state.editingTemplate && state.templateDirty) {
+    showConfirmModal('Выйти без сохранения?', 'Изменения в шаблоне пропадут.', 'Выйти', () => closeTemplateEditor(true));
+    return;
+  }
+  if (state.editingTemplate && state.editingTemplateIsNew) {
+    fetch(`/api/templates/${state.editingTemplate.id}`, { method: 'DELETE' }).catch(() => {});
+  }
+  state.editingTemplateIsNew = false;
+  state.templateDirty = false;
   document.getElementById('templates-list-view').style.display = 'block';
   document.getElementById('template-editor-view').style.display = 'none';
   state.editingTemplate = null;
@@ -637,6 +682,7 @@ function closeTemplateEditor() {
 
 function onTemplatePropChange() {
   if (!state.editingTemplate) return;
+  state.templateDirty = true;
 
   // Collect all values
   state.editingTemplate.name = document.getElementById('editor-template-name').value;
@@ -762,7 +808,7 @@ function updatePreviewInfo() {
     `${t.output?.width || 1080}×${t.output?.height || 1920}`;
 
   // Update preview frame dimensions
-  const frame = document.getElementById('preview-frame');
+  const frame = document.getElementById('template-preview-frame');
   const aspectMap = {
     '9:16': { w: 270, h: 480 },
     '16:9': { w: 480, h: 270 },
@@ -779,7 +825,7 @@ function updatePreviewInfo() {
   const mediaContainer = document.getElementById('preview-media');
   if (mediaContainer) {
     const thumbImg = document.getElementById('video-thumb');
-    if (thumbImg && thumbImg.src && thumbImg.src.startsWith('http')) {
+    if (thumbImg && thumbImg.getAttribute('src')) {
       mediaContainer.innerHTML = `<img src="${thumbImg.src}" class="preview-frame__img" alt="Превью" style="width:100%; height:100%; object-fit:cover;">`;
     }
     // Apply live color correction filter preview
@@ -839,6 +885,8 @@ async function saveCurrentTemplate() {
     });
 
     if (!response.ok) throw new Error('Failed to save');
+    state.templateDirty = false;
+    state.editingTemplateIsNew = false;
     if (state.selectedTemplateId === state.editingTemplate.id) {
       state.selectedTemplate = structuredClone(state.editingTemplate);
       document.getElementById('selected-template-name').textContent = state.editingTemplate.name;

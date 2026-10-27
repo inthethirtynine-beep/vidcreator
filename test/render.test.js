@@ -76,6 +76,21 @@ test('ad holds freeze a moving video, insert silence and resume all source conte
   assert.ok(audioRms(out,3.2,.5)>.05,'source audio resumes');
   assert.ok(audioRms(out,9.2,.5)>.05,'audio tail survives');
 });
+test('video banner sound plays during the freeze and can be switched off', async t=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'vidcreator-ad-audio-'));
+  t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const source=path.join(dir,'source.mp4'), banner=path.join(dir,'banner.mp4'), out=path.join(dir,'out.mp4'), muted=path.join(dir,'muted.mp4');
+  ffmpeg(['-f','lavfi','-i','testsrc2=s=320x568:r=20:d=6','-f','lavfi','-i','sine=frequency=440:duration=6','-c:v','libx264','-preset','ultrafast','-c:a','aac','-shortest',source]);
+  ffmpeg(['-f','lavfi','-i','color=red:s=200x80:r=20:d=2','-f','lavfi','-i','sine=frequency=880:duration=2','-c:v','libx264','-preset','ultrafast','-c:a','aac','-shortest',banner]);
+  const make=adAudio=>plan({enabled:true,assetIds:['a'],count:1,firstStart:2,endPadding:1,fade:.1,width:80,y:50,freezeOnAd:true,adAudio},[{duration:6}],()=>({animated:true,duration:2}))[0].map(e=>({...e,asset:{filePath:banner,animated:true}}));
+  await renderClip(source,out,0,6,{output:{width:320,height:568,preset:'ultrafast'}},null,make(true));
+  assert.ok(Math.abs((await getVideoInfo(out)).duration-8)<.15);
+  assert.ok(audioRms(out,1.2,.5)>.05,'source audio before the ad');
+  assert.ok(audioRms(out,2.6,.8)>.05,'banner sound is heard during the freeze');
+  assert.ok(audioRms(out,4.6,.5)>.05,'source audio resumes after the ad');
+  await renderClip(source,muted,0,6,{output:{width:320,height:568,preset:'ultrafast'}},null,make(false));
+  assert.ok(audioRms(muted,2.6,.8)<.005,'muted banner leaves the freeze silent');
+});
 test('freeze at the first frame works for a source without audio', async t=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'vidcreator-first-frame-'));
   t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));

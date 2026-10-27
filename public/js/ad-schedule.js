@@ -48,6 +48,7 @@
         assetId: selected[i],
         start: Math.round(start * 1000) / 1000, duration: durations[i], width, x, y, opacity,
         fade: animation === 'none' ? 0 : Math.min(transition, durations[i] / 2), animation, freeze,
+        audio: c.adAudio !== false,
       }));
     });
   }

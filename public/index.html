@@ -9,21 +9,24 @@
   <link rel="stylesheet" href="/css/studio.css"><link rel="stylesheet" href="/css/canvas-editor.css">
   <link rel="stylesheet" href="/css/editor.css">
   <link rel="stylesheet" href="/css/icons.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=Unbounded:wght@500;600;700&display=swap">
+  <link rel="stylesheet" href="/css/polish.css">
   <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">
 </head>
-<body>
+<body class="booting">
   <div class="app">
     <!-- ===== Navbar ===== -->
-<nav class="navbar"><a href="#" class="navbar__brand" onclick="navigate('home')"><div class="navbar__logo">v.</div><div class="studio-wordmark"><span class="navbar__title">VidCreator</span><small>CREATOR STUDIO</small></div></a><div class="nav-label">РАБОЧЕЕ ПРОСТРАНСТВО</div><div class="navbar__nav"><button class="nav-btn" data-page="home" onclick="navigate('home')"><span class="nav-btn__icon"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="camera-reels-fill"><use href="/icons/bi.svg#bi-camera-reels-fill"></use></svg></span><span>Видеостудия</span></button><button class="nav-btn" data-page="templates" onclick="navigate('templates')"><span class="nav-btn__icon"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="grid-fill"><use href="/icons/bi.svg#bi-grid-fill"></use></svg></span><span>Мои шаблоны</span></button><button class="nav-btn" data-page="render" onclick="navigate('render')"><span class="nav-btn__icon"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="cloud-arrow-down-fill"><use href="/icons/bi.svg#bi-cloud-arrow-down-fill"></use></svg></span><span>Экспорт и файлы</span></button></div><div class="navbar__actions"><div class="sidebar-note"><strong>Твоя студия. Твои правила.</strong>Из одного видео — серия клипов с твоим оформлением и рекламой.</div><div class="status-pill" id="engine-status"><span class="status-pill__dot"></span><span>Проверка FFmpeg…</span></div><div class="sidebar-footer"><span>Локальная студия</span><span>v.02</span></div></div></nav>
+<nav class="navbar"><a href="#" class="navbar__brand" onclick="navigate('home')"><div class="navbar__logo">v.</div><div class="studio-wordmark"><span class="navbar__title">VidCreator</span><small>студия нарезки</small></div></a><div class="nav-label">Разделы</div><div class="navbar__nav"><button class="nav-btn" data-page="home" onclick="navigate('home')"><span class="nav-btn__icon"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="camera-reels-fill"><use href="/icons/bi.svg#bi-camera-reels-fill"></use></svg></span><span>Видеостудия</span></button><button class="nav-btn" data-page="templates" onclick="navigate('templates')"><span class="nav-btn__icon"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="grid-fill"><use href="/icons/bi.svg#bi-grid-fill"></use></svg></span><span>Мои шаблоны</span></button><button class="nav-btn" data-page="render" onclick="navigate('render')"><span class="nav-btn__icon"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="cloud-arrow-down-fill"><use href="/icons/bi.svg#bi-cloud-arrow-down-fill"></use></svg></span><span>Экспорт и файлы</span></button></div><div class="navbar__actions"><div class="sidebar-note"><strong>Твоя студия. Твои правила.</strong>Из одного видео — серия клипов с твоим оформлением и рекламой.</div><div class="status-pill" id="engine-status"><span class="status-pill__dot"></span><span>Проверка FFmpeg…</span></div><div class="sidebar-footer"><span>Локальная студия</span><span>v.02</span></div></div></nav>
 
     <!-- ===== Main Content ===== -->
-    <main class="main-content"><div class="studio-topbar"><span>Рабочее пространство <span style="margin:0 10px;color:#515c60">/</span> <strong id="studio-breadcrumb">Видеостудия</strong></span><span class="local-tag">LOCAL WORKSPACE</span></div>
+    <main class="main-content"><div class="studio-topbar"><span>Рабочее пространство <span style="margin:0 10px;color:#515c60">/</span> <strong id="studio-breadcrumb">Видеостудия</strong></span><span class="local-tag"><i class="local-tag__dot" aria-hidden="true"></i>Работает на этом компьютере</span></div>
 
       <!-- ========== HOME PAGE ========== -->
       <div id="page-home" class="page-view active">
-        <div class="studio-heading"><div><div class="eyebrow">MAKE EVERY CUT COUNT</div><h1>Длинное видео. Большие возможности.</h1><p>Нарезай, оформляй и добавляй рекламу — в одном месте.</p></div><span class="project-tag">YOUR NEXT GREAT VIDEO <svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="arrow-up-right-circle-fill"><use href="/icons/bi.svg#bi-arrow-up-right-circle-fill"></use></svg></span></div>
-        <div class="studio-steps" aria-label="Этапы создания"><button class="studio-step active" onclick="studioStep(1)"><span>01</span>Исходник</button><button class="studio-step" onclick="studioStep(2)"><span>02</span>Оформление</button><button class="studio-step" onclick="studioStep(3)"><span>03</span>Нарезка</button><button class="studio-step" onclick="studioStep(4)"><span>04</span>Реклама и экспорт</button></div>
-        <div class="studio-layout"><section class="studio-panel"><div class="panel-heading"><h2 id="studio-panel-title">Добавь исходное видео</h2><small id="studio-step-count">ШАГ 01 / 04</small></div><div class="workflow">
+        <div class="studio-heading"><div><h1>Из длинного видео — серия клипов с рекламой</h1><p>Загрузи исходник, выбери оформление и нарезку. На время рекламного баннера кадр замирает, а звук ставится на паузу.</p></div><button type="button" class="project-tag" id="studio-source-chip" onclick="navigate('editor')" title="Открыть исходник в редакторе"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="grid-1x2-fill"><use href="/icons/bi.svg#bi-grid-1x2-fill"></use></svg><span id="studio-source-chip-text">Открыть редактор</span></button></div>
+        <nav class="studio-steps" aria-label="Этапы создания"><i class="studio-steps__progress" id="studio-steps-progress" aria-hidden="true"></i><button class="studio-step active" data-step="1" onclick="studioStep(1)"><span>1</span><em><b>Исходник</b><small id="studio-step-note-1">—</small></em></button><button class="studio-step" data-step="2" onclick="studioStep(2)"><span>2</span><em><b>Оформление</b><small id="studio-step-note-2">—</small></em></button><button class="studio-step" data-step="3" onclick="studioStep(3)"><span>3</span><em><b>Нарезка</b><small id="studio-step-note-3">—</small></em></button><button class="studio-step" data-step="4" onclick="studioStep(4)"><span>4</span><em><b>Реклама и экспорт</b><small id="studio-step-note-4">—</small></em></button></nav>
+        <div class="studio-layout"><section class="studio-panel"><div class="panel-heading"><h2 id="studio-panel-title">Добавь исходное видео</h2><small id="studio-step-count">Шаг 1 из 4</small></div><div class="workflow">
 
           <!-- Step 1: Upload Video -->
           <div class="workflow__step active" id="step-upload">
@@ -152,7 +155,8 @@
                     </div>
                   </div>
                   <div style="margin-top: var(--space-md); display: flex; gap: var(--space-sm);">
-                    <button class="btn btn--ghost btn--sm" onclick="removeVideo()"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="trash3-fill"><use href="/icons/bi.svg#bi-trash3-fill"></use></svg> Удалить</button>
+                    <button class="btn btn--ghost btn--sm" onclick="removeVideo()" title="Удалить файл с диска"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="trash3-fill"><use href="/icons/bi.svg#bi-trash3-fill"></use></svg> Удалить</button>
+                    <button class="btn btn--secondary btn--sm" onclick="changeSource()" title="Выбрать другое видео, этот файл останется в библиотеке"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="collection-play-fill"><use href="/icons/bi.svg#bi-collection-play-fill"></use></svg> Другое видео</button>
                     <button class="btn btn--primary btn--sm" onclick="activateStep(2)">Далее <svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="arrow-right-circle-fill"><use href="/icons/bi.svg#bi-arrow-right-circle-fill"></use></svg></button>
                   </div>
                 </div>
@@ -264,13 +268,13 @@
 
               <div style="margin-top: var(--space-lg); text-align: right;">
                 <button class="btn btn--primary btn--lg" onclick="studioStep(4)" id="slice-next-btn">
-                  Реклама и экспорт →
+                  Реклама и экспорт <svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="arrow-right-circle-fill"><use href="/icons/bi.svg#bi-arrow-right-circle-fill"></use></svg>
                 </button>
               </div>
             </div>
           </div>
           <div class="workflow__step" id="step-ads"><div id="ad-editor"></div></div>
-        </div></section><aside class="studio-panel preview-panel"><div class="panel-heading"><h2>Предпросмотр</h2><small id="preview-ratio">9:16</small></div><div class="preview-canvas"><div class="preview-frame" id="preview-frame"><div class="preview-empty" id="preview-empty"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="camera-reels-fill"><use href="/icons/bi.svg#bi-camera-reels-fill"></use></svg><p>Твоя следующая история начинается здесь</p></div><video id="studio-video" playsinline muted></video><div class="preview-text" id="preview-text"></div><img class="preview-ad" id="preview-ad-image" alt="Рекламный баннер"><video class="preview-ad" id="preview-ad-video" playsinline muted></video><div class="preview-safe"></div></div></div><div class="preview-controls"><div class="preview-control-row"><button class="preview-play" id="preview-play" onclick="toggleStudioPlayback()" aria-label="Воспроизвести"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="play-fill"><use href="/icons/bi.svg#bi-play-fill"></use></svg></button><span id="preview-clock">00:00 / 00:00</span><span id="preview-clip-label">ИСХОДНИК</span></div><input id="preview-seek" type="range" min="0" max="100" step="0.05" value="0" aria-label="Позиция воспроизведения" oninput="seekStudio(this.value)"></div><div class="preview-footer"><span id="preview-format">Вертикальный формат</span><b id="preview-ad-status">Без рекламы</b></div></aside></div><div class="studio-bottom"><span><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="star-fill"><use href="/icons/bi.svg#bi-star-fill"></use></svg> Сделано для твоего творческого потока</span><span>Исходник → клипы → готово к публикации</span></div>
+        </div></section><aside class="studio-panel preview-panel"><div class="panel-heading"><h2>Предпросмотр</h2><small id="preview-ratio">9:16</small></div><div class="preview-canvas"><div class="preview-frame" id="preview-frame"><div class="preview-empty" id="preview-empty"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="camera-reels-fill"><use href="/icons/bi.svg#bi-camera-reels-fill"></use></svg><p>Твоя следующая история начинается здесь</p></div><video id="studio-video" playsinline muted></video><div class="preview-text" id="preview-text"></div><img class="preview-ad" id="preview-ad-image" alt="Рекламный баннер"><video class="preview-ad" id="preview-ad-video" playsinline muted></video><div class="preview-safe"></div></div></div><div class="preview-controls"><div class="preview-control-row"><button class="preview-play" id="preview-play" onclick="toggleStudioPlayback()" aria-label="Воспроизвести"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="play-fill"><use href="/icons/bi.svg#bi-play-fill"></use></svg></button><button class="preview-sound" id="preview-sound" onclick="toggleStudioSound()" aria-label="Выключить звук" aria-pressed="true" title="Звук предпросмотра"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="volume-up-fill"><use href="/icons/bi.svg#bi-volume-up-fill"></use></svg></button><span id="preview-clock">00:00 / 00:00</span><span id="preview-clip-label">ИСХОДНИК</span></div><input id="preview-seek" type="range" min="0" max="100" step="0.05" value="0" aria-label="Позиция воспроизведения" oninput="seekStudio(this.value)"></div><div class="preview-footer"><span id="preview-format">Вертикальный формат</span><b id="preview-ad-status">Без рекламы</b></div></aside></div>
       </div>
 
       <!-- ========== TEMPLATES PAGE ========== -->
@@ -526,7 +530,7 @@
                   <svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="grid-3x3-gap-fill"><use href="/icons/bi.svg#bi-grid-3x3-gap-fill"></use></svg> Сетка
                 </button>
               </div>
-              <div class="preview-frame" id="preview-frame">
+              <div class="preview-frame" id="template-preview-frame">
                 <!-- Video or background container -->
                 <div class="preview-frame__media" id="preview-media">
                   <div class="preview-frame__content" id="preview-content">
@@ -581,8 +585,8 @@
     <div class="toast-container" id="toast-container"></div>
 
     <!-- Delete Confirmation Modal -->
-    <div class="modal-overlay hidden" id="confirm-modal">
-      <div class="modal">
+    <div class="modal-overlay hidden" id="confirm-modal" onclick="if(event.target===this)closeConfirmModal()">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
         <div class="modal__header">
           <h3 class="modal__title" id="confirm-modal-title">Подтверждение</h3>
           <button class="modal__close" onclick="closeConfirmModal()" aria-label="Закрыть окно"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="x-circle-fill"><use href="/icons/bi.svg#bi-x-circle-fill"></use></svg></button>

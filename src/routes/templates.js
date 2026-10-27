@@ -93,21 +93,28 @@ router.get('/', (req, res) => {
 
     res.json(templates);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.status || 500).json({ error: err.message });
   }
 });
+
+// Template ids become file names, so only plain ids are accepted (no "../").
+const SAFE_ID = /^[A-Za-z0-9_-]{1,80}$/;
+const templatePath = id => {
+  if (!SAFE_ID.test(String(id))) throw Object.assign(new Error('Invalid template id'), { status: 400 });
+  return path.join(TEMPLATES_DIR, `${id}.json`);
+};
 
 // GET /api/templates/:id — get full template
 router.get('/:id', (req, res) => {
   try {
-    const filePath = path.join(TEMPLATES_DIR, `${req.params.id}.json`);
+    const filePath = templatePath(req.params.id);
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ error: 'Template not found' });
     }
     const template = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
     res.json(template);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.status || 500).json({ error: err.message });
   }
 });
 
@@ -115,7 +122,7 @@ router.get('/:id', (req, res) => {
 router.post('/', (req, res) => {
   try {
     const template = { ...createDefaultTemplate(), ...req.body };
-    template.id = template.id || uuidv4();
+    template.id = SAFE_ID.test(String(template.id || '')) ? template.id : uuidv4();
     template.createdAt = new Date().toISOString();
     template.updatedAt = new Date().toISOString();
 
@@ -124,14 +131,14 @@ router.post('/', (req, res) => {
 
     res.status(201).json(template);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.status || 500).json({ error: err.message });
   }
 });
 
 // PUT /api/templates/:id — update template
 router.put('/:id', (req, res) => {
   try {
-    const filePath = path.join(TEMPLATES_DIR, `${req.params.id}.json`);
+    const filePath = templatePath(req.params.id);
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ error: 'Template not found' });
     }
@@ -144,14 +151,14 @@ router.put('/:id', (req, res) => {
     fs.writeFileSync(filePath, JSON.stringify(updated, null, 2));
     res.json(updated);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.status || 500).json({ error: err.message });
   }
 });
 
 // DELETE /api/templates/:id — delete template
 router.delete('/:id', (req, res) => {
   try {
-    const filePath = path.join(TEMPLATES_DIR, `${req.params.id}.json`);
+    const filePath = templatePath(req.params.id);
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ error: 'Template not found' });
     }
@@ -159,14 +166,14 @@ router.delete('/:id', (req, res) => {
     fs.unlinkSync(filePath);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.status || 500).json({ error: err.message });
   }
 });
 
 // POST /api/templates/:id/duplicate — duplicate template
 router.post('/:id/duplicate', (req, res) => {
   try {
-    const filePath = path.join(TEMPLATES_DIR, `${req.params.id}.json`);
+    const filePath = templatePath(req.params.id);
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ error: 'Template not found' });
     }
@@ -185,7 +192,7 @@ router.post('/:id/duplicate', (req, res) => {
 
     res.status(201).json(duplicate);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.status || 500).json({ error: err.message });
   }
 });
 

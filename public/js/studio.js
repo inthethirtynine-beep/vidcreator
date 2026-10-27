@@ -5,14 +5,18 @@ adConfig = { enabled: false, freezeOnAd: true, assetIds: [], count: 2, duration:
 let bannerAssets = [], adPlans = [], selectedClip = 0, studioStepNumber = 1, previewSourceId = null, previewAssetId = null;
 let sliceRequestVersion = 0;
 let previewOutputTime = 0, previewPlaying = false, previewTickTime = 0, previewAnimation = null;
+let previewSound = localStorage.getItem('vidcreator.previewSound') !== 'off';
 const originalActivateStep = activateStep;
 activateStep = function (n) {
   studioStepNumber = n;
   originalActivateStep(n);
   document.querySelectorAll('.studio-step').forEach((el, i) => el.classList.toggle('active', i === n - 1));
   document.getElementById('studio-panel-title').textContent = ['Добавь исходное видео', 'Задай стиль своим клипам', 'Собери свою серию', 'Реклама под твоим контролем'][n - 1];
-  document.getElementById('studio-step-count').textContent = `ШАГ 0${n} / 04`;
+  document.getElementById('studio-step-count').textContent = `Шаг ${n} из 4`;
   if (n === 4) { renderAdEditor(); updateAdPlan(); }
+  refreshStudioSteps();
+  // Banner tools belong to the ads step only; hide them as soon as another step opens.
+  if (typeof syncCanvasEditor === 'function') syncCanvasEditor(canvasData);
 };
 function studioStep(n) {
   if (n > 1 && !state.currentVideoId) return showToast('Сначала добавь исходное видео', 'info');
@@ -88,7 +92,9 @@ async function restoreSource(id, restore = false) {
       const templateId = localStorage.getItem('vidcreator.template');
       if (templateId) {
         const templateResponse = await fetch(`/api/templates/${templateId}`);
-        if (templateResponse.ok) await selectTemplate(templateId);
+        // Restoring the last session is not a user action, so it stays silent.
+        state.restoringSession = true;
+        try { if (templateResponse.ok) await selectTemplate(templateId); } finally { state.restoringSession = false; }
       }
       let slice;
       try { slice = JSON.parse(localStorage.getItem('vidcreator.slice')); } catch {}
@@ -128,11 +134,13 @@ function renderAdEditor() {
   container.innerHTML = `<label class="ad-toggle"><input type="checkbox" ${adConfig.enabled ? 'checked' : ''} onchange="adSet('enabled',this.checked);renderAdEditor();updateAdPlan()">Добавлять рекламные баннеры</label>
     <p class="ad-help">Баннер поверх видео, как в твоём примере. Каждый клип получает собственное расписание.</p>
     <label class="btn btn--secondary" style="cursor:pointer;display:inline-flex">${uiIcon("plus-circle-fill")} Загрузить баннер<input id="banner-upload" type="file" accept=".png,.jpg,.jpeg,.webp,.gif,.mp4,.webm,.mov" hidden onchange="uploadBanner(this.files[0])"></label>
-    <p class="ad-help">PNG с прозрачностью, JPG, WebP, GIF, MP4, WebM, MOV · до 100 МБ. Баннеры воспроизводятся без звука.</p>
+    <p class="ad-help">PNG с прозрачностью, JPG, WebP, GIF, MP4, WebM, MOV · до 100 МБ. У видеобаннеров сохраняется звук.</p>
     <div class="ad-library" id="ad-library"></div>
     <div class="ad-fields" ${adConfig.enabled ? '' : 'hidden'}>
     <label class="ad-toggle"><input id="ad-freeze" type="checkbox" ${adConfig.freezeOnAd ? 'checked' : ''} onchange="adSet('freezeOnAd',this.checked)">Стоп-кадр и пауза звука на время рекламы</label>
     <p class="ad-help">После баннера видео и звук продолжаются с того же места. Длительность клипа увеличивается на время рекламных показов.</p>
+    <label class="ad-toggle"><input id="ad-audio" type="checkbox" ${adConfig.adAudio !== false ? 'checked' : ''} onchange="adSet('adAudio',this.checked);applyPreviewAudio()">Звук видеобаннера</label>
+    <p class="ad-help">Звук из MP4, WebM и MOV играет во время показа. На стоп-кадре звук исходника на паузе, поэтому слышна только реклама.</p>
     <div class="form-row">${adNumber('ad-count','Показов в каждом клипе','count',0,20)}${adNumber('ad-duration','Показ PNG / JPG, сек','duration',.2,120,.1)}</div>
     <p class="ad-help">Видеобаннеры и GIF проигрываются один раз по длине файла. Стоп-кадр подстраивается под каждый баннер автоматически.</p>
     <div class="form-row">${adNumber('ad-first','Первый показ, сек','firstStart',0,86400,.1)}${adNumber('ad-gap','Минимальная пауза, сек','minGap',0,3600,.1)}</div>
@@ -278,8 +286,27 @@ function pauseStudioPlayback() {
   document.getElementById('studio-video').pause();
   document.getElementById('preview-ad-video').pause();
 }
+// Source sound follows the template volume; banner sound follows the ads setting.
+function applyPreviewAudio() {
+  const video = document.getElementById('studio-video');
+  video.muted = !previewSound;
+  video.volume = Math.max(0, Math.min(1, state.selectedTemplate?.audio?.volume ?? 1));
+  document.getElementById('preview-ad-video').muted = !previewSound || adConfig.adAudio === false;
+}
+function paintSoundButton() {
+  uiSetIcon('preview-sound', previewSound ? 'volume-up-fill' : 'volume-mute-fill');
+  const button = document.getElementById('preview-sound');
+  button.setAttribute('aria-pressed', String(previewSound));
+  button.setAttribute('aria-label', previewSound ? 'Выключить звук' : 'Включить звук');
+}
+function toggleStudioSound() {
+  previewSound = !previewSound;
+  localStorage.setItem('vidcreator.previewSound', previewSound ? 'on' : 'off');
+  applyPreviewAudio(); paintSoundButton();
+}
 function applyStudioPlayback() {
   const video = document.getElementById('studio-video');
+  applyPreviewAudio();
   const source = AdSchedule.sourceAt(previewOutputTime, adPlans[selectedClip]);
   const target = (state.segments[selectedClip]?.start || 0) + source.time;
   if (source.frozen || !previewPlaying) {
@@ -394,3 +421,47 @@ function resetStudioSource() {
   const video = document.getElementById('studio-video'); video.pause(); video.removeAttribute('src'); video.load();
   syncStudioPreview(); paintPreview();
 }
+
+/* Step ruler: what each step already holds, which steps are reachable, and where the playhead stands. */
+const plural = (n, one, few, many) => {
+  const mod10 = n % 10, mod100 = n % 100;
+  return `${n} ${mod10 === 1 && mod100 !== 11 ? one : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14) ? few : many}`;
+};
+function studioStepReachable(n) {
+  if (n <= 1) return true;
+  if (!state.currentVideoId) return false;
+  if (n === 2) return true;
+  if (!state.selectedTemplateId) return false;
+  return n === 3 || state.segments.length > 0;
+}
+function refreshStudioSteps() {
+  const ads = adConfig.enabled ? (adConfig.assetIds.length ? plural(adConfig.assetIds.length, 'баннер', 'баннера', 'баннеров') : 'Нужен баннер') : 'Без рекламы';
+  const notes = [
+    state.currentVideoId ? formatTime(state.currentVideoInfo?.duration || 0) : 'Нет видео',
+    state.selectedTemplate?.name || 'Не выбрано',
+    state.segments.length ? plural(state.segments.length, 'клип', 'клипа', 'клипов') : 'Не задана',
+    ads,
+  ];
+  const done = [!!state.currentVideoId, !!state.selectedTemplateId, state.segments.length > 0, false];
+  document.querySelectorAll('.studio-step').forEach((el, i) => {
+    const n = i + 1, current = n === studioStepNumber, reachable = studioStepReachable(n);
+    el.classList.toggle('done', done[i] && !current);
+    el.classList.toggle('locked', !reachable);
+    el.setAttribute('aria-disabled', String(!reachable));
+    if (current) el.setAttribute('aria-current', 'step'); else el.removeAttribute('aria-current');
+    const note = document.getElementById(`studio-step-note-${n}`);
+    if (note) { note.textContent = notes[i]; note.title = notes[i]; }
+  });
+  document.getElementById('studio-steps-progress').style.transform = `translateX(${(studioStepNumber - 1) * 100}%)`;
+  const chip = document.getElementById('studio-source-chip-text');
+  if (chip) chip.textContent = state.currentVideoId ? 'Открыть в редакторе' : 'Открыть редактор';
+}
+const baseSyncStudioPreview = syncStudioPreview;
+syncStudioPreview = function (...args) { refreshStudioSteps(); return baseSyncStudioPreview.apply(this, args); };
+const baseUpdateAdPlan = updateAdPlan;
+updateAdPlan = function (...args) { const result = baseUpdateAdPlan.apply(this, args); refreshStudioSteps(); return result; };
+const baseDeselectTemplate = deselectTemplate;
+deselectTemplate = function (...args) { baseDeselectTemplate.apply(this, args); refreshStudioSteps(); };
+refreshStudioSteps();
+setTimeout(() => document.body.classList.remove('booting'), 700);
+paintSoundButton(); applyPreviewAudio();
