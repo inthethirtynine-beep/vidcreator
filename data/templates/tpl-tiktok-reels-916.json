@@ -1,0 +1,43 @@
+{
+  "id": "tpl-tiktok-reels-916",
+  "name": "⚡ TikTok & Reels (9:16)",
+  "description": "Идеально для вертикальных соцсетей: 1080×1920, центрирование кадра, сочные цвета",
+  "createdAt": "2026-10-27T00:00:00.000Z",
+  "updatedAt": "2026-10-27T00:00:00.000Z",
+  "output": {
+    "width": 1080,
+    "height": 1920,
+    "aspectRatio": "9:16",
+    "preset": "fast",
+    "crf": 23,
+    "audioBitrate": "192k"
+  },
+  "crop": {
+    "x": "(iw-ow)/2",
+    "y": "0",
+    "width": "ih*9/16",
+    "height": "ih"
+  },
+  "colorCorrection": {
+    "brightness": 0.02,
+    "contrast": 1.08,
+    "saturation": 1.15
+  },
+  "textOverlays": [],
+  "watermark": {
+    "enabled": false,
+    "path": "",
+    "x": "W-w-30",
+    "y": "30",
+    "opacity": 0.8
+  },
+  "transitions": {
+    "fadeIn": 0.3,
+    "fadeOut": 0.3
+  },
+  "audio": {
+    "volume": 1,
+    "fadeIn": 0.2,
+    "fadeOut": 0.3
+  }
+}

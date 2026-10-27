@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="VidCreator — локальный сервис для нарезки видео по кастомным шаблонам">
+  <title>VidCreator — Видеоредактор шаблонов</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎬</text></svg>">
+</head>
+<body>
+  <div class="app">
+    <!-- ===== Navbar ===== -->
+    <nav class="navbar">
+      <a href="#" class="navbar__brand" onclick="navigate('home')">
+        <div class="navbar__logo">🎬</div>
+        <span class="navbar__title">VidCreator</span>
+      </a>
+      <div class="navbar__nav">
+        <button class="nav-btn active" data-page="home" onclick="navigate('home')">
+          <span class="nav-btn__icon">🏠</span>
+          <span>Главная</span>
+        </button>
+        <button class="nav-btn" data-page="templates" onclick="navigate('templates')">
+          <span class="nav-btn__icon">📐</span>
+          <span>Шаблоны</span>
+        </button>
+        <button class="nav-btn" data-page="render" onclick="navigate('render')">
+          <span class="nav-btn__icon">🎥</span>
+          <span>Рендер</span>
+        </button>
+      </div>
+    </nav>
+
+    <!-- ===== Main Content ===== -->
+    <main class="main-content">
+
+      <!-- ========== HOME PAGE ========== -->
+      <div id="page-home" class="page-view active">
+        <div class="workflow">
+
+          <!-- Step 1: Upload Video -->
+          <div class="workflow__step active" id="step-upload">
+            <div class="step-header">
+              <div class="step-number">1</div>
+              <div>
+                <div class="step-title">Выбери видео</div>
+                <div class="step-subtitle">Загрузи файл с компьютера или скачай напрямую с YouTube</div>
+              </div>
+            </div>
+
+            <!-- Import Mode Tabs -->
+            <div class="import-switcher">
+              <button type="button" class="import-tab-btn active" id="import-tab-file" onclick="setImportMode('file')">
+                📁 Файл с ПК
+              </button>
+              <button type="button" class="import-tab-btn" id="import-tab-yt" onclick="setImportMode('youtube')">
+                <span class="yt-logo-badge">▶</span> YouTube ссылка
+              </button>
+            </div>
+
+            <div id="upload-area">
+              <!-- Mode 1: File Upload -->
+              <div id="import-file-panel">
+                <div class="upload-zone" id="upload-zone">
+                  <div class="upload-zone__icon">📁</div>
+                  <div class="upload-zone__title">Перетащи видео сюда или кликни для выбора</div>
+                  <div class="upload-zone__subtitle">Поддерживаются MP4, MKV, AVI, MOV, WebM (до 5 ГБ)</div>
+                  <input type="file" id="video-input" class="upload-zone__input" accept="video/*">
+                </div>
+
+                <div id="upload-progress-area" style="display:none; margin-top: var(--space-md);">
+                  <div class="upload-progress">
+                    <div class="upload-progress__info">
+                      <span id="upload-filename">file.mp4</span>
+                      <span id="upload-percent">0%</span>
+                    </div>
+                    <div class="progress-bar">
+                      <div class="progress-bar__fill" id="upload-bar" style="width: 0%"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Mode 2: YouTube Downloader -->
+              <div id="import-yt-panel" style="display:none;">
+                <div class="yt-card">
+                  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom: var(--space-xs);">
+                    <div style="font-weight:700; font-size:1.05rem; display:flex; align-items:center; gap:8px;">
+                      <span class="yt-logo-badge">▶</span> Скачать видео с YouTube
+                    </div>
+                    <span style="font-size:0.75rem; color:var(--text-muted); background:var(--surface-glass); padding:2px 8px; border-radius:4px;">
+                      VidKraken API v2
+                    </span>
+                  </div>
+                  <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:var(--space-md);">
+                    Вставь ссылку на длинное видео или Shorts. Видео скачается в максимальном качестве и сразу добавится в проект.
+                  </p>
+
+                  <div class="yt-input-row">
+                    <input type="text" class="form-input yt-url-input" id="yt-url-input"
+                      placeholder="https://www.youtube.com/watch?v=... или https://youtu.be/..."
+                      onkeydown="if(event.key==='Enter') startYouTubeDownload()">
+                    <select class="form-select yt-format-select" id="yt-format-select">
+                      <option value="1080" selected>1080p (Full HD)</option>
+                      <option value="720">720p (HD)</option>
+                      <option value="480">480p (SD)</option>
+                    </select>
+                    <button class="btn btn--primary" id="yt-download-btn" onclick="startYouTubeDownload()" style="white-space:nowrap;">
+                      ⬇ Скачать
+                    </button>
+                  </div>
+
+                  <!-- Optional API Key toggle -->
+                  <div style="margin-top: var(--space-sm);">
+                    <span class="yt-api-toggle" onclick="toggleApiKeyInput()">
+                      ⚙️ Настройка API ключа <span id="yt-api-arrow">▼</span>
+                    </span>
+                    <div id="yt-api-settings" style="display:none; margin-top: var(--space-xs);">
+                      <input type="text" class="form-input" id="yt-api-key-input"
+                        placeholder="API Key" value="507f2f9f-8cc1-491d-9a46-65dbff0af0b7"
+                        style="font-family: var(--font-mono); font-size: 0.8rem;">
+                      <p style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">
+                        Ключ VidKraken API для скачивания с YouTube без ограничений
+                      </p>
+                    </div>
+                  </div>
+
+                  <!-- Progress Area -->
+                  <div class="yt-progress-container" id="yt-progress-area" style="display:none;">
+                    <div class="yt-progress-title">
+                      <span id="yt-progress-title-text">Загрузка...</span>
+                      <span id="yt-progress-percent" style="font-family:var(--font-mono); color:var(--accent-light);">0%</span>
+                    </div>
+                    <div class="yt-progress-status" id="yt-progress-status-text">Инициализация задачи...</div>
+                    <div class="progress-bar">
+                      <div class="progress-bar__fill" id="yt-progress-bar" style="width: 0%;"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Video Info (shown after upload) -->
+            <div id="video-info-area" style="display:none;" class="card" style="margin-top: var(--space-lg);">
+              <div class="video-info">
+                <img id="video-thumb" class="video-info__thumb" src="" alt="Превью">
+                <div class="video-info__meta">
+                  <div class="video-info__name" id="video-name">—</div>
+                  <div class="meta-grid">
+                    <div class="meta-item">
+                      <div class="meta-item__label">Длительность</div>
+                      <div class="meta-item__value" id="video-duration">—</div>
+                    </div>
+                    <div class="meta-item">
+                      <div class="meta-item__label">Разрешение</div>
+                      <div class="meta-item__value" id="video-resolution">—</div>
+                    </div>
+                    <div class="meta-item">
+                      <div class="meta-item__label">Кодек</div>
+                      <div class="meta-item__value" id="video-codec">—</div>
+                    </div>
+                    <div class="meta-item">
+                      <div class="meta-item__label">FPS</div>
+                      <div class="meta-item__value" id="video-fps">—</div>
+                    </div>
+                  </div>
+                  <div style="margin-top: var(--space-md); display: flex; gap: var(--space-sm);">
+                    <button class="btn btn--ghost btn--sm" onclick="removeVideo()">🗑️ Удалить</button>
+                    <button class="btn btn--primary btn--sm" onclick="activateStep(2)">Далее →</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 2: Choose Template -->
+          <div class="workflow__step" id="step-template">
+            <div class="step-header">
+              <div class="step-number">2</div>
+              <div>
+                <div class="step-title">Выбери шаблон</div>
+                <div class="step-subtitle">Выбери существующий или создай новый</div>
+              </div>
+            </div>
+
+            <div id="template-select-area">
+              <div class="cards-grid" id="template-select-grid">
+                <!-- Templates will be rendered here -->
+              </div>
+            </div>
+
+            <div id="selected-template-info" style="display:none;" class="card" style="margin-top: var(--space-md);">
+              <div style="display:flex; align-items:center; justify-content:space-between;">
+                <div>
+                  <div style="font-weight: 700; font-size: 1rem;">Выбран: <span id="selected-template-name" style="color: var(--accent-light);">—</span></div>
+                  <div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px;" id="selected-template-desc">—</div>
+                </div>
+                <div style="display:flex; gap: var(--space-sm);">
+                  <button class="btn btn--ghost btn--sm" onclick="deselectTemplate()">Сменить</button>
+                  <button class="btn btn--primary btn--sm" onclick="activateStep(3)">Далее →</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 3: Slice Settings -->
+          <div class="workflow__step" id="step-slice">
+            <div class="step-header">
+              <div class="step-number">3</div>
+              <div>
+                <div class="step-title">Настрой нарезку</div>
+                <div class="step-subtitle">Авто-режим или ручные таймкоды</div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="slice-controls">
+                <div class="slice-mode-tabs">
+                  <button class="slice-mode-tab active" data-mode="auto" onclick="setSliceMode('auto')">⚡ Авто</button>
+                  <button class="slice-mode-tab" data-mode="manual" onclick="setSliceMode('manual')">✏️ Ручной</button>
+                </div>
+              </div>
+
+              <!-- Auto mode controls -->
+              <div id="slice-auto-controls">
+                <div class="form-row">
+                  <div class="form-group">
+                    <label class="form-label">Длительность сегмента (сек)</label>
+                    <input type="number" class="form-input" id="segment-duration" value="120" min="10" max="3600" onchange="updateSlicePreview()">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Перекрытие (сек)</label>
+                    <input type="number" class="form-input" id="segment-overlap" value="0" min="0" max="30" onchange="updateSlicePreview()">
+                  </div>
+                </div>
+              </div>
+
+              <!-- Manual mode controls -->
+              <div id="slice-manual-controls" style="display:none;">
+                <div class="timecodes-list" id="timecodes-list">
+                  <!-- Timecode rows will be added here -->
+                </div>
+                <button class="btn btn--secondary btn--sm" onclick="addTimecodeRow()" style="margin-top: var(--space-sm);">
+                  + Добавить сегмент
+                </button>
+              </div>
+
+              <!-- Timeline preview -->
+              <div class="timeline-container" style="margin-top: var(--space-lg);">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: var(--space-sm);">
+                  <span style="font-size: 0.85rem; font-weight: 600;">Превью нарезки</span>
+                  <span style="font-size: 0.8rem; color: var(--text-muted);" id="segments-count">0 сегментов</span>
+                </div>
+                <div class="timeline" id="timeline">
+                  <div class="timeline__thumbnails" id="timeline-thumbs">
+                    <!-- Thumbnails or placeholder -->
+                  </div>
+                </div>
+                <div class="timeline__time-marks" id="timeline-marks">
+                  <!-- Time marks -->
+                </div>
+              </div>
+
+              <!-- Segments grid -->
+              <div class="segments-grid" id="segments-grid">
+                <!-- Segment cards -->
+              </div>
+
+              <div style="margin-top: var(--space-lg); text-align: right;">
+                <button class="btn btn--primary btn--lg" onclick="startRender()" id="start-render-btn">
+                  🚀 Запустить рендер
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========== TEMPLATES PAGE ========== -->
+      <div id="page-templates" class="page-view">
+        <div id="templates-list-view">
+          <div class="section-header">
+            <div>
+              <h1 class="section-title">Шаблоны</h1>
+              <div class="section-subtitle">Создавай и управляй шаблонами для нарезки</div>
+            </div>
+            <button class="btn btn--primary" onclick="createNewTemplate()">
+              + Новый шаблон
+            </button>
+          </div>
+
+          <div class="cards-grid" id="templates-grid">
+            <!-- Template cards rendered by JS -->
+          </div>
+        </div>
+
+        <!-- Template Editor -->
+        <div id="template-editor-view" style="display:none;">
+          <div class="section-header">
+            <div style="display:flex; align-items:center; gap: var(--space-md);">
+              <button class="btn btn--ghost btn--icon" onclick="closeTemplateEditor()">←</button>
+              <div>
+                <input type="text" class="form-input" id="editor-template-name" value="Новый шаблон"
+                  style="font-size: 1.2rem; font-weight: 700; background: transparent; border: none; padding: 0; color: var(--text-primary);"
+                  onchange="onTemplatePropChange()">
+                <div class="section-subtitle">Редактирование шаблона</div>
+              </div>
+            </div>
+            <div style="display:flex; gap: var(--space-sm);">
+              <button class="btn btn--secondary" onclick="saveCurrentTemplate()">💾 Сохранить</button>
+            </div>
+          </div>
+
+          <div class="template-editor">
+            <!-- Sidebar controls -->
+            <div class="template-editor__sidebar">
+
+              <!-- Output Settings -->
+              <div class="editor-section">
+                <div class="editor-section__header" onclick="toggleSection(this)">
+                  <div class="editor-section__title">📐 Выходной формат</div>
+                  <span class="editor-section__toggle">▼</span>
+                </div>
+                <div class="editor-section__body">
+                  <div class="form-group">
+                    <label class="form-label">Соотношение сторон</label>
+                    <select class="form-select" id="editor-aspect" onchange="onAspectChange()">
+                      <option value="9:16" selected>9:16 (Reels/Shorts)</option>
+                      <option value="16:9">16:9 (YouTube)</option>
+                      <option value="1:1">1:1 (Instagram)</option>
+                      <option value="4:5">4:5 (Instagram Portrait)</option>
+                    </select>
+                  </div>
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label class="form-label">Пресет</label>
+                      <select class="form-select" id="editor-preset" onchange="onTemplatePropChange()">
+                        <option value="ultrafast">Ultrafast</option>
+                        <option value="fast">Fast</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="slow">Slow</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">CRF (качество)</label>
+                      <div class="range-group">
+                        <input type="range" id="editor-crf" min="15" max="35" value="23" onchange="onTemplatePropChange()">
+                        <span class="range-value" id="editor-crf-value">23</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Crop/Zoom -->
+              <div class="editor-section">
+                <div class="editor-section__header" onclick="toggleSection(this)">
+                  <div class="editor-section__title">🔍 Кроп / Зум</div>
+                  <span class="editor-section__toggle">▼</span>
+                </div>
+                <div class="editor-section__body">
+                  <div class="form-group">
+                    <label class="form-label">Позиция X (формула)</label>
+                    <input type="text" class="form-input" id="editor-crop-x" value="iw/2-ow/2" placeholder="iw/2-ow/2" onchange="onTemplatePropChange()">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Позиция Y (формула)</label>
+                    <input type="text" class="form-input" id="editor-crop-y" value="0" placeholder="0" onchange="onTemplatePropChange()">
+                  </div>
+                  <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: var(--space-xs);">
+                    Используй FFmpeg выражения: iw=ширина входа, ih=высота входа, ow=ширина выхода
+                  </p>
+                </div>
+              </div>
+
+              <!-- Color Correction -->
+              <div class="editor-section">
+                <div class="editor-section__header" onclick="toggleSection(this)">
+                  <div class="editor-section__title">🎨 Цветокоррекция</div>
+                  <span class="editor-section__toggle">▼</span>
+                </div>
+                <div class="editor-section__body">
+                  <div class="form-group">
+                    <label class="form-label">Яркость</label>
+                    <div class="range-group">
+                      <input type="range" id="editor-brightness" min="-1" max="1" step="0.05" value="0" onchange="onTemplatePropChange()">
+                      <span class="range-value" id="editor-brightness-value">0</span>
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Контраст</label>
+                    <div class="range-group">
+                      <input type="range" id="editor-contrast" min="0.5" max="2" step="0.05" value="1" onchange="onTemplatePropChange()">
+                      <span class="range-value" id="editor-contrast-value">1</span>
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Насыщенность</label>
+                    <div class="range-group">
+                      <input type="range" id="editor-saturation" min="0" max="3" step="0.05" value="1" onchange="onTemplatePropChange()">
+                      <span class="range-value" id="editor-saturation-value">1</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Text Overlays -->
+              <div class="editor-section">
+                <div class="editor-section__header" onclick="toggleSection(this)">
+                  <div class="editor-section__title">✏️ Текстовые наложения</div>
+                  <span class="editor-section__toggle">▼</span>
+                </div>
+                <div class="editor-section__body">
+                  <div id="text-overlays-list">
+                    <!-- Text overlay items rendered by JS -->
+                  </div>
+                  <button class="btn btn--secondary btn--sm" onclick="addTextOverlay()" style="width: 100%;">
+                    + Добавить текст
+                  </button>
+                </div>
+              </div>
+
+              <!-- Watermark -->
+              <div class="editor-section">
+                <div class="editor-section__header" onclick="toggleSection(this)">
+                  <div class="editor-section__title">💧 Водяной знак</div>
+                  <span class="editor-section__toggle">▼</span>
+                </div>
+                <div class="editor-section__body">
+                  <div class="toggle-row">
+                    <span class="toggle-row__label">Включить</span>
+                    <label class="toggle">
+                      <input type="checkbox" id="editor-wm-enabled" onchange="onTemplatePropChange()">
+                      <span class="toggle__slider"></span>
+                    </label>
+                  </div>
+                  <div id="watermark-settings" style="margin-top: var(--space-md);">
+                    <div class="form-group">
+                      <label class="form-label">Путь к файлу (PNG)</label>
+                      <input type="text" class="form-input" id="editor-wm-path" placeholder="C:\path\to\logo.png" onchange="onTemplatePropChange()">
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Прозрачность</label>
+                      <div class="range-group">
+                        <input type="range" id="editor-wm-opacity" min="0" max="1" step="0.05" value="0.7" onchange="onTemplatePropChange()">
+                        <span class="range-value" id="editor-wm-opacity-value">0.7</span>
+                      </div>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Позиция</label>
+                      <div class="position-grid" id="wm-position-grid">
+                        <div class="position-grid__cell" data-pos="tl" onclick="setWmPosition('tl')">↖</div>
+                        <div class="position-grid__cell" data-pos="tc" onclick="setWmPosition('tc')">↑</div>
+                        <div class="position-grid__cell" data-pos="tr" onclick="setWmPosition('tr')" >↗</div>
+                        <div class="position-grid__cell" data-pos="ml" onclick="setWmPosition('ml')">←</div>
+                        <div class="position-grid__cell" data-pos="mc" onclick="setWmPosition('mc')">•</div>
+                        <div class="position-grid__cell" data-pos="mr" onclick="setWmPosition('mr')">→</div>
+                        <div class="position-grid__cell" data-pos="bl" onclick="setWmPosition('bl')">↙</div>
+                        <div class="position-grid__cell" data-pos="bc" onclick="setWmPosition('bc')">↓</div>
+                        <div class="position-grid__cell active" data-pos="br" onclick="setWmPosition('br')">↘</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Transitions -->
+              <div class="editor-section">
+                <div class="editor-section__header" onclick="toggleSection(this)">
+                  <div class="editor-section__title">✨ Переходы</div>
+                  <span class="editor-section__toggle">▼</span>
+                </div>
+                <div class="editor-section__body">
+                  <div class="form-group">
+                    <label class="form-label">Fade In (сек)</label>
+                    <div class="range-group">
+                      <input type="range" id="editor-fade-in" min="0" max="3" step="0.1" value="0" onchange="onTemplatePropChange()">
+                      <span class="range-value" id="editor-fade-in-value">0</span>
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Fade Out (сек)</label>
+                    <div class="range-group">
+                      <input type="range" id="editor-fade-out" min="0" max="3" step="0.1" value="0" onchange="onTemplatePropChange()">
+                      <span class="range-value" id="editor-fade-out-value">0</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Audio -->
+              <div class="editor-section">
+                <div class="editor-section__header" onclick="toggleSection(this)">
+                  <div class="editor-section__title">🔊 Аудио</div>
+                  <span class="editor-section__toggle">▼</span>
+                </div>
+                <div class="editor-section__body">
+                  <div class="form-group">
+                    <label class="form-label">Громкость</label>
+                    <div class="range-group">
+                      <input type="range" id="editor-volume" min="0" max="2" step="0.05" value="1" onchange="onTemplatePropChange()">
+                      <span class="range-value" id="editor-volume-value">1</span>
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Audio Fade In (сек)</label>
+                    <div class="range-group">
+                      <input type="range" id="editor-audio-fade-in" min="0" max="3" step="0.1" value="0" onchange="onTemplatePropChange()">
+                      <span class="range-value" id="editor-audio-fade-in-value">0</span>
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Audio Fade Out (сек)</label>
+                    <div class="range-group">
+                      <input type="range" id="editor-audio-fade-out" min="0" max="3" step="0.1" value="0" onchange="onTemplatePropChange()">
+                      <span class="range-value" id="editor-audio-fade-out-value">0</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Preview area -->
+            <div class="template-editor__preview">
+              <div class="preview-frame" id="preview-frame">
+                <div class="preview-frame__content" id="preview-content">
+                  <span style="font-size: 2rem;">📱</span>
+                  <span>Превью шаблона</span>
+                  <span style="font-size: 0.7rem; color: var(--text-muted);">Загрузи видео для превью</span>
+                </div>
+              </div>
+              <div style="text-align: center;">
+                <div style="font-size: 0.8rem; color: var(--text-muted);">Формат: <span id="preview-aspect" style="color: var(--accent-light); font-weight: 600;">9:16</span></div>
+                <div style="font-size: 0.8rem; color: var(--text-muted);">Разрешение: <span id="preview-resolution" style="color: var(--accent-light); font-weight: 600;">1080×1920</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========== RENDER PAGE ========== -->
+      <div id="page-render" class="page-view">
+        <div class="section-header">
+          <div>
+            <h1 class="section-title">Очередь рендера</h1>
+            <div class="section-subtitle">Все задачи рендеринга</div>
+          </div>
+        </div>
+
+        <div id="render-jobs-list">
+          <div class="empty-state" id="no-jobs-state">
+            <div class="empty-state__icon">🎥</div>
+            <div class="empty-state__title">Нет активных задач</div>
+            <div class="empty-state__text">Загрузи видео, выбери шаблон и запусти рендер на главной странице</div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- Toast container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal-overlay hidden" id="confirm-modal">
+      <div class="modal">
+        <div class="modal__header">
+          <h3 class="modal__title" id="confirm-modal-title">Подтверждение</h3>
+          <button class="modal__close" onclick="closeConfirmModal()">×</button>
+        </div>
+        <p id="confirm-modal-text" style="color: var(--text-secondary);">Вы уверены?</p>
+        <div class="modal__footer">
+          <button class="btn btn--secondary" onclick="closeConfirmModal()">Отмена</button>
+          <button class="btn btn--danger" id="confirm-modal-btn" onclick="confirmModalAction()">Удалить</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>

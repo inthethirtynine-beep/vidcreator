@@ -1,0 +1,43 @@
+{
+  "id": "72051aba-582c-4e66-a0fc-327e42ea3ab7",
+  "name": "Новый шаблон",
+  "description": "",
+  "createdAt": "2026-10-27T04:50:52.795Z",
+  "updatedAt": "2026-10-27T04:50:52.795Z",
+  "output": {
+    "width": 1080,
+    "height": 1920,
+    "aspectRatio": "9:16",
+    "preset": "medium",
+    "crf": 23,
+    "audioBitrate": "192k"
+  },
+  "crop": {
+    "x": "iw/2-ow/2",
+    "y": "0",
+    "width": "ih*9/16",
+    "height": "ih"
+  },
+  "colorCorrection": {
+    "brightness": 0,
+    "contrast": 1,
+    "saturation": 1
+  },
+  "textOverlays": [],
+  "watermark": {
+    "enabled": false,
+    "path": "",
+    "x": "W-w-20",
+    "y": "20",
+    "opacity": 0.7
+  },
+  "transitions": {
+    "fadeIn": 0,
+    "fadeOut": 0
+  },
+  "audio": {
+    "volume": 1,
+    "fadeIn": 0,
+    "fadeOut": 0
+  }
+}

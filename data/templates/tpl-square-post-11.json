@@ -1,0 +1,43 @@
+{
+  "id": "tpl-square-post-11",
+  "name": "📸 Квадратный пост (1:1)",
+  "description": "Формат 1080×1080 для постов и ленты соцсетей",
+  "createdAt": "2026-10-27T00:00:00.000Z",
+  "updatedAt": "2026-10-27T00:00:00.000Z",
+  "output": {
+    "width": 1080,
+    "height": 1080,
+    "aspectRatio": "1:1",
+    "preset": "fast",
+    "crf": 23,
+    "audioBitrate": "192k"
+  },
+  "crop": {
+    "x": "(iw-ow)/2",
+    "y": "0",
+    "width": "ih",
+    "height": "ih"
+  },
+  "colorCorrection": {
+    "brightness": 0,
+    "contrast": 1.05,
+    "saturation": 1.1
+  },
+  "textOverlays": [],
+  "watermark": {
+    "enabled": false,
+    "path": "",
+    "x": "W-w-20",
+    "y": "20",
+    "opacity": 0.7
+  },
+  "transitions": {
+    "fadeIn": 0.2,
+    "fadeOut": 0.2
+  },
+  "audio": {
+    "volume": 1,
+    "fadeIn": 0.2,
+    "fadeOut": 0.2
+  }
+}

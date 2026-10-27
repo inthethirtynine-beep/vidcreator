@@ -1,0 +1,53 @@
+{
+  "id": "tpl-shorts-hook-916",
+  "name": "🔥 YouTube Shorts с хуком",
+  "description": "Вертикальный 9:16 со стильным завлекающим заголовком вверху кадра",
+  "createdAt": "2026-10-27T00:00:00.000Z",
+  "updatedAt": "2026-10-27T00:00:00.000Z",
+  "output": {
+    "width": 1080,
+    "height": 1920,
+    "aspectRatio": "9:16",
+    "preset": "fast",
+    "crf": 22,
+    "audioBitrate": "192k"
+  },
+  "crop": {
+    "x": "(iw-ow)/2",
+    "y": "0",
+    "width": "ih*9/16",
+    "height": "ih"
+  },
+  "colorCorrection": {
+    "brightness": 0.03,
+    "contrast": 1.05,
+    "saturation": 1.12
+  },
+  "textOverlays": [
+    {
+      "content": "СМОТРИ ДО КОНЦА 🔥",
+      "fontSize": 54,
+      "fontColor": "yellow",
+      "x": "(w-text_w)/2",
+      "y": "160",
+      "borderWidth": 4,
+      "shadowColor": "black"
+    }
+  ],
+  "watermark": {
+    "enabled": false,
+    "path": "",
+    "x": "W-w-30",
+    "y": "30",
+    "opacity": 0.7
+  },
+  "transitions": {
+    "fadeIn": 0.4,
+    "fadeOut": 0.4
+  },
+  "audio": {
+    "volume": 1,
+    "fadeIn": 0.2,
+    "fadeOut": 0.4
+  }
+}
