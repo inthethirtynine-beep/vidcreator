@@ -192,9 +192,14 @@ function buildFilterComplex(template, videoInfo) {
   const outputWidth = template.output?.width || 1080;
   const outputHeight = template.output?.height || 1920;
   // Playback speed from the studio (0.25–4×): retime the picture first, keep a steady frame rate.
+  // Output frame rate: the export setting (30 by default) caps the source rate. Dropping frames first
+  // halves the work of every later filter and of the encoder for 60 fps recordings.
   const speed = Number(template.framing?.speed) || 1;
-  if (Math.abs(speed - 1) > .001) {
-    filters.push(`[0:v]setpts=PTS/${speed}${template._fps ? `,fps=${Math.min(60, Math.round(template._fps * 1000) / 1000)}` : ''}[speedv]`);
+  const sourceFps = Number(template._fps) || 0, cap = Number(template.output?.fps) || 0;
+  const targetFps = sourceFps ? Math.min(60, cap ? Math.min(cap, sourceFps) : sourceFps) : cap;
+  const retime = Math.abs(speed - 1) > .001, dropFrames = targetFps && (!sourceFps || sourceFps > targetFps + .5);
+  if (retime || dropFrames) {
+    filters.push(`[0:v]${retime ? `setpts=PTS/${speed},` : ''}fps=${Math.round(targetFps * 1000) / 1000 || 30}[speedv]`);
     currentLabel = 'speedv';
   }
   if(template.composition){
@@ -336,7 +341,9 @@ function buildFilterComplex(template, videoInfo) {
  */
 async function renderClip(inputPath, outputPath, startTime, duration, template, onProgress, adEvents = [], options = {}) {
   const encoder = require('./encoder');
-  const kind = options.encoder || await encoder.detect();
+  let kind = options.encoder || await encoder.detect();
+  // A GPU switched off after a failure in this run stays off for every worker.
+  if (kind !== 'cpu' && (await encoder.detect()) === 'cpu') kind = 'cpu';
   const hasHolds = adEvents.some(event => event.freeze);
   // Video banners keep their own soundtrack (unless switched off); probe each file once.
   const probes = new Map();
@@ -347,13 +354,14 @@ async function renderClip(inputPath, outputPath, startTime, duration, template, 
     return probes.get(file);
   }));
   const speed = Math.max(.25, Math.min(4, Number(template.framing?.speed) || 1));
-  const inputInfo = hasHolds || adHasAudio.some(Boolean) || template.framing ? await getVideoInfo(inputPath) : null;
+  // Probed every time: source frame rate, size and audio drive the frame-rate cap, framing and speed.
+  const inputInfo = await getVideoInfo(inputPath).catch(() => null);
   // `duration` is source time; after a speed change the clip lasts duration / speed, and ad times,
   // fades and the final length are all measured in that output time.
   const contentDuration = duration / speed;
   const finalDuration = outputDuration(contentDuration, adEvents);
   const originalTemplate = template;
-  if (template.framing) template = { ...template, _fps: inputInfo?.fps, framing: { ...template.framing, _source: inputInfo?.width ? { width: inputInfo.width, height: inputInfo.height } : null } };
+  template = { ...template, _fps: inputInfo?.fps, ...(template.framing ? { framing: { ...template.framing, _source: inputInfo?.width ? { width: inputInfo.width, height: inputInfo.height } : null } } : {}) };
   return new Promise((resolve, reject) => {
     const textFiles = [];
     template = { ...template, textOverlays: (template.textOverlays || []).filter(text=>!template.sourceTimed||text.showTo>startTime&&text.showFrom<startTime+duration).map((text, i) => {
@@ -492,9 +500,9 @@ async function renderClip(inputPath, outputPath, startTime, duration, template, 
     }
 
     // Output settings
-    args.push(...encoder.videoArgs(kind, template));
-    // Filter graphs (blur, overlays, text) are the CPU-heavy part: let them use every core.
-    args.push('-filter_complex_threads', String(Math.max(2, require('os').cpus().length)));
+    args.push(...encoder.videoArgs(kind, template, { threads: options.threads, fast: options.fast && kind === 'cpu' }));
+    // Filter graphs (blur, overlays, text) are CPU work: each parallel render gets its share of the cores.
+    args.push('-filter_complex_threads', String(options.threads || Math.max(2, require('os').cpus().length)));
     args.push('-c:a', 'aac');
     args.push('-b:a', template.output?.audioBitrate || '192k');
     args.push('-movflags', '+faststart');
@@ -502,7 +510,7 @@ async function renderClip(inputPath, outputPath, startTime, duration, template, 
     args.push('-progress', 'pipe:1');
     args.push(outputPath);
 
-    const proc = spawn('ffmpeg', args, { windowsHide: true });
+    const proc = require('./process').track(spawn('ffmpeg', args, { windowsHide: true }));
     options.control?.procs?.add(proc);
     let stderr = '';
 

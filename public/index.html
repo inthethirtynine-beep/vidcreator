@@ -339,6 +339,8 @@
                   <button type="button" class="chip-btn active" onclick="setPresetDuration(120)"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="lightning-charge-fill"><use href="/icons/bi.svg#bi-lightning-charge-fill"></use></svg> 2 мин</button>
                   <button type="button" class="chip-btn" onclick="setPresetDuration(300)"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="lightning-charge-fill"><use href="/icons/bi.svg#bi-lightning-charge-fill"></use></svg> 5 мин</button>
                 </div>
+                <label class="ad-toggle slice-merge"><input type="checkbox" id="slice-merge-tail" checked onchange="updateSlicePreview()">Присоединять короткий остаток к последнему клипу</label>
+                <p class="ad-help">Если в конце остаётся меньше половины клипа (например, 20 секунд после клипов по 2 минуты), он добавляется к предыдущему клипу, и в нём хватает места для рекламы.</p>
               </div>
 
               <div id="slice-count-controls" style="display:none"><label class="form-label" for="clip-count">На сколько клипов разделить видео</label><input class="form-input" type="number" id="clip-count" min="1" max="1000" value="5" onchange="updateSlicePreview()"><p class="ad-help">Например, 20 минут → 5 клипов по 4 минуты. Весь исходник будет сохранён.</p></div>
@@ -673,8 +675,9 @@
         <div class="section-header">
           <div>
             <h1 class="section-title">Очередь рендера</h1>
-            <div class="section-subtitle">Все задачи рендеринга</div>
+            <div class="section-subtitle" id="render-summary">Все задачи рендеринга</div>
           </div>
+          <button type="button" class="btn btn--danger btn--sm" id="render-clear-all" onclick="deleteAllRenderJobs()" hidden><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="trash3-fill"><use href="/icons/bi.svg#bi-trash3-fill"></use></svg> Удалить все готовые</button>
         </div>
 
         <div id="render-jobs-list">

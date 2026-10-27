@@ -1362,6 +1362,7 @@ async function startRender() {
         adConfig: typeof getAdConfig === 'function' ? getAdConfig() : undefined,
         framing: typeof getFraming === 'function' ? getFraming() : undefined,
         reaction: typeof getReactionForRender === 'function' ? getReactionForRender() : undefined,
+        fps: typeof getExportFps === 'function' ? getExportFps() : 30,
       }),
     });
 
@@ -1439,7 +1440,38 @@ async function loadRenderJobs() {
 }
 
 let emptyJobsElement = null;
+function formatBytes(bytes) {
+  if (bytes >= 1073741824) return `${(bytes / 1073741824).toFixed(1).replace('.', ',')} ГБ`;
+  if (bytes >= 1048576) return `${Math.round(bytes / 1048576)} МБ`;
+  return `${Math.max(1, Math.round(bytes / 1024))} КБ`;
+}
+// Old exports: one at a time, or every finished one at once (running renders are never touched).
+function deleteRenderJob(jobId) {
+  showConfirmModal('Удалить экспорт?', 'Клипы этой задачи будут удалены с диска без возможности восстановления.', 'Удалить', async () => {
+    try {
+      const response = await fetch(`/api/render/jobs/${jobId}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error((await response.json()).error);
+      showToast('Экспорт удалён', 'info'); loadRenderJobs();
+    } catch (err) { showToast(err.message, 'error'); }
+  });
+}
+function deleteAllRenderJobs() {
+  const finished = (window.lastRenderJobs || []).filter(j => !['queued', 'processing'].includes(j.status));
+  const size = finished.reduce((sum, j) => sum + (j.sizeBytes || 0), 0);
+  showConfirmModal('Удалить все готовые экспорты?', `Будет удалено задач: ${finished.length}, освободится ${formatBytes(size)}. Идущие рендеры не затрагиваются. Восстановить файлы будет нельзя.`, 'Удалить все', async () => {
+    try {
+      const result = await (await fetch('/api/render/jobs', { method: 'DELETE' })).json();
+      showToast(`Удалено экспортов: ${result.count}, освобождено ${formatBytes(result.bytes)}`, 'success'); loadRenderJobs();
+    } catch (err) { showToast(err.message, 'error'); }
+  });
+}
+
 function renderJobsList(jobs) {
+  window.lastRenderJobs = jobs;
+  const finished = jobs.filter(j => !['queued', 'processing'].includes(j.status));
+  const total = finished.reduce((sum, j) => sum + (j.sizeBytes || 0), 0);
+  document.getElementById('render-clear-all').hidden = !finished.length;
+  document.getElementById('render-summary').textContent = jobs.length ? `Задач: ${jobs.length}${total ? ` · на диске ${formatBytes(total)}` : ''}` : 'Все задачи рендеринга';
   const container = document.getElementById('render-jobs-list');
   const emptyState = document.getElementById('no-jobs-state') || emptyJobsElement;
   emptyJobsElement = emptyState;
@@ -1463,7 +1495,7 @@ function renderJobsList(jobs) {
     el.innerHTML = `
       <div class="render-job__header">
         <div>
-          <span class="render-job__id">${escapeHtml(job.name || job.id.slice(0, 8)+'...')}</span>
+          <span class="render-job__id">${escapeHtml(job.name || job.id.slice(0, 8)+'...')}</span>${job.sizeBytes ? ` <span class="render-job__size">${formatBytes(job.sizeBytes)}</span>` : ''}
           <span style="margin-left: var(--space-sm); font-size: 0.8rem; color: var(--text-muted);">
             ${new Date(job.createdAt).toLocaleString('ru')}
           </span>
@@ -1481,9 +1513,11 @@ function renderJobsList(jobs) {
         <span class="progress-status" id="job-status-${job.id}">${renderJobStatusText(job)}</span>
       </div>
       ${job.errorsCount ? `<div class="render-error">Ошибки в ${job.errorsCount} клипах. Открой детали задачи для проверки.</div>` : ''}
-      ${['completed', 'partial', 'error'].includes(job.status) ? `
-        <div style="margin-top: var(--space-md);">
-          <button class="btn btn--primary btn--sm" onclick="viewJobResults('${job.id}')">${uiIcon("folder-fill")} Показать файлы</button>
+      ${['completed', 'partial', 'error', 'cancelled'].includes(job.status) ? `
+        <div class="render-job__buttons">
+          ${job.resultsCount ? `<button class="btn btn--primary btn--sm" onclick="viewJobResults('${job.id}')">${uiIcon("folder-fill")} Показать файлы</button>` : ''}
+          ${job.resultsCount ? `<a class="btn btn--secondary btn--sm" href="/api/render/jobs/${job.id}/download-all" download title="Все клипы задачи одним ZIP-архивом">${uiIcon("cloud-arrow-down-fill")} Скачать все${job.resultsCount > 1 ? ` (${job.resultsCount})` : ''}${job.sizeBytes ? ` · ${formatBytes(job.sizeBytes)}` : ''}</a>` : ''}
+          <button class="btn btn--ghost btn--sm render-job__delete" onclick="deleteRenderJob('${job.id}')">${uiIcon("trash3-fill")} Удалить</button>
         </div>
         <div class="results-grid" id="job-results-${job.id}" style="margin-top: var(--space-md); display: none;"></div>
       ` : ''}
@@ -1586,7 +1620,7 @@ async function viewJobResults(jobId) {
       card.className = 'result-card';
       card.innerHTML = `
         <div class="result-card__preview">
-          <video src="${file.downloadUrl}" preload="metadata" muted></video>
+          <video src="${file.downloadUrl}#t=1" preload="metadata" muted></video>
         </div>
         <div class="result-card__info">
           <div class="result-card__name">${file.fileName}</div>

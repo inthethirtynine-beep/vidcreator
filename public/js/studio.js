@@ -53,7 +53,7 @@ setSliceMode = function (mode) {
 const originalGetSliceConfig = getSliceConfig;
 getSliceConfig = function () {
   if (state.sliceMode === 'count') return { mode: 'count', clipCount: Number(document.getElementById('clip-count').value) };
-  if (state.sliceMode === 'auto') return { mode: 'auto', segmentDuration: Number(document.getElementById('segment-duration').value), overlap: Number(document.getElementById('segment-overlap').value) };
+  if (state.sliceMode === 'auto') return { mode: 'auto', segmentDuration: Number(document.getElementById('segment-duration').value), overlap: Number(document.getElementById('segment-overlap').value), mergeTail: document.getElementById('slice-merge-tail').checked };
   return originalGetSliceConfig();
 };
 updateSlicePreview = async function () {
@@ -102,6 +102,7 @@ async function restoreSource(id, restore = false) {
       if (slice) {
         document.getElementById('segment-duration').value = slice.segmentDuration ?? 120;
         document.getElementById('segment-overlap').value = slice.overlap ?? 0;
+        document.getElementById('slice-merge-tail').checked = slice.mergeTail !== false;
         document.getElementById('clip-count').value = slice.clipCount ?? 5;
         state.manualTimecodes = slice.timecodes || [];
         renderTimecodeRows();
@@ -157,6 +158,7 @@ function renderAdEditor() {
     </details>
     <p class="ad-help">Время показов задаётся по исходному содержимому каждой нарезки. При стоп-кадре дальнейшие моменты сдвигаются на время пауз; дорожка ниже показывает итоговое видео.</p></div>
     <div id="ad-validation" role="status" aria-live="polite"></div><div id="ad-clips"></div>
+    <div class="export-settings"><label class="form-label" for="export-fps">Частота кадров в готовых клипах</label><select id="export-fps" class="form-select" onchange="setExportFps(this.value)"><option value="30">30 кадров/с — быстрее, стандарт Shorts и TikTok</option><option value="60">60 кадров/с — плавнее, рендер примерно вдвое дольше</option><option value="0">Как в исходнике</option></select></div>
     <div class="ad-toolbar"><button class="btn btn--ghost" onclick="studioStep(3)">${uiIcon("arrow-left-circle-fill")} Нарезка</button><button class="btn btn--primary" id="start-render-btn" onclick="startRender()">Экспортировать клипы ${uiIcon("arrow-up-right-circle-fill")}</button></div>`;
   document.getElementById('ad-rotation').value = adConfig.rotation;
   document.getElementById('ad-animation').value = adConfig.animation;
@@ -651,3 +653,9 @@ function adPreviewStyle(patch) {
     styleBannerPreview(el, el.offsetWidth, el.offsetHeight, patch.radius ?? adConfig.radius ?? 0, patch.shadow ?? adConfig.shadow ?? 0, frame.clientWidth);
   });
 }
+
+// Export frame rate: 30 by default (half the work for 60 fps recordings), 60 or the source rate on demand.
+function getExportFps() { const v = localStorage.getItem('vidcreator.export.fps'); return v === null ? 30 : Number(v); }
+function setExportFps(value) { localStorage.setItem('vidcreator.export.fps', String(Number(value) || 0)); }
+const baseRenderAdEditorForFps = renderAdEditor;
+renderAdEditor = function (...args) { const result = baseRenderAdEditorForFps.apply(this, args); const select = document.getElementById('export-fps'); if (select) select.value = String(getExportFps()); return result; };

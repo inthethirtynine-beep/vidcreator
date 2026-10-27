@@ -7,9 +7,10 @@
  * @param {number} totalDuration - total video duration in seconds
  * @param {number} segmentDuration - desired segment duration in seconds
  * @param {number} [overlap=0] - overlap between segments in seconds
+ * @param {boolean} [mergeTail=true] - join a leftover shorter than half a clip to the last clip
  * @returns {Array<{index: number, start: number, end: number, duration: number}>}
  */
-function autoSlice(totalDuration, segmentDuration, overlap = 0) {
+function autoSlice(totalDuration, segmentDuration, overlap = 0, mergeTail = true) {
   if (![totalDuration, segmentDuration, overlap].every(Number.isFinite) || totalDuration <= 0 || segmentDuration <= 0 || overlap < 0 || overlap >= segmentDuration) {
     throw new Error('Длительность должна быть положительной, перекрытие — меньше длины клипа');
   }
@@ -34,6 +35,16 @@ function autoSlice(totalDuration, segmentDuration, overlap = 0) {
     index++;
   }
 
+  // A tiny leftover (e.g. 20 s after 2-minute clips) has no room for ads and looks broken as its own
+  // clip: make the previous clip a little longer instead.
+  const last = segments.at(-1);
+  if (mergeTail && segments.length > 1 && last.duration < segmentDuration / 2) {
+    segments.pop();
+    const previous = segments.at(-1);
+    previous.end = last.end;
+    previous.duration = Math.round((previous.end - previous.start) * 1000) / 1000;
+  }
+
   return segments;
 }
 
@@ -48,7 +59,7 @@ function sliceByCount(totalDuration, count) {
 
 function createSegments(totalDuration, config = {}) {
   switch (config.mode || 'auto') {
-    case 'auto': return autoSlice(totalDuration, config.segmentDuration ?? 120, config.overlap ?? 0);
+    case 'auto': return autoSlice(totalDuration, config.segmentDuration ?? 120, config.overlap ?? 0, config.mergeTail !== false);
     case 'count': return sliceByCount(totalDuration, config.clipCount);
     case 'manual': return manualSlice(config.timecodes, totalDuration);
     default: throw new Error('Неизвестный режим нарезки');

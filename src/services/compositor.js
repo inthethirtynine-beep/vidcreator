@@ -2,7 +2,8 @@
 function compose(composition,width,height,input='0:v'){
   const layers=composition.layers.filter(l=>l.enabled);
   const filters=[`[${input}]split=${layers.length+1}[sceneBg]${layers.map((_,i)=>`[sceneSrc${i}]`).join('')}`];
-  filters.push(`[sceneBg]scale=${width}:${height},setsar=1,drawbox=c=${composition.background}:t=fill[scene0]`);
+  // The background is a flat colour: fill a tiny frame and enlarge it, instead of scaling the whole source.
+  filters.push(`[sceneBg]scale=16:16,setsar=1,drawbox=c=${composition.background}:t=fill,scale=${width}:${height}:flags=neighbor,setsar=1[scene0]`);
   layers.forEach((layer,i)=>{
     const c=layer.crop,r=layer.rect;
     const w=Math.max(2,Math.round(r.w*width/2)*2),h=Math.max(2,Math.round(r.h*height/2)*2);

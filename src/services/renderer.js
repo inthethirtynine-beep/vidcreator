@@ -3,6 +3,7 @@ const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 const { renderClip, getVideoInfo } = require('./ffmpeg');
 const encoder = require('./encoder');
+const { killTree } = require('./process');
 const { createSegments } = require('./slicer');
 const { plan, outputDuration } = require('../../public/js/ad-schedule');
 const { getAsset } = require('../routes/banners');
@@ -154,7 +155,7 @@ async function processJob(jobId) {
     sendSSE(jobId, 'progress', { overallProgress: job.overallProgress, etaSeconds: job.etaSeconds, doneSegments: job.doneSegments, totalSegments: job.totalSegments, active: progress.filter((p, i) => p > 0 && p < 100 && !job.results.some(r => r.segmentIndex === i)).length });
   };
 
-  const worker = async () => {
+  const worker = async ({ kind, threads, fast }) => {
     while (!control.cancelled && next < job.segments.length) {
       const i = next++, segment = job.segments[i];
       job.currentSegment = i;
@@ -164,7 +165,7 @@ async function processJob(jobId) {
       try {
         await renderClip(job.videoPath, outputPath, segment.start, segment.duration, job.template,
           value => { progress[i] = value; report(); },
-          job.adPlans?.[i] || [], { control });
+          job.adPlans?.[i] || [], { control, encoder: kind, threads, fast });
         progress[i] = 100;
         job.results.push({
           segmentIndex: i,
@@ -187,7 +188,9 @@ async function processJob(jobId) {
       persist(job);
     }
   };
-  await Promise.all(Array.from({ length: Math.min(await encoder.parallelism(), job.segments.length) }, worker));
+  // GPU and CPU workers run side by side; each takes the next clip when it is free.
+  const plan = (await encoder.workerPlan()).slice(0, job.segments.length);
+  await Promise.all(plan.map(worker));
   controls.delete(jobId);
   job.results.sort((x, y) => x.segmentIndex - y.segmentIndex);
   if (control.cancelled) {
@@ -236,8 +239,14 @@ function getJob(jobId) {
 /**
  * Get all jobs
  */
+// Size of a job's folder on disk, shown in the queue so old exports can be cleaned up knowingly.
+function folderSize(dir) {
+  try { return fs.readdirSync(dir, { withFileTypes: true }).reduce((sum, e) => sum + (e.isFile() ? fs.statSync(path.join(dir, e.name)).size : 0), 0); } catch { return 0; }
+}
+
 function getAllJobs() {
   return Array.from(jobs.values()).map(j => ({
+    sizeBytes: folderSize(j.outputDir),
     id: j.id,
     name:j.name,
     status: j.status,
@@ -255,6 +264,26 @@ function getAllJobs() {
   }));
 }
 
+/** Remove a finished job and its files. Running or queued jobs must be cancelled first. */
+function deleteJob(jobId) {
+  const job = jobs.get(jobId);
+  if (!job) return null;
+  if (['queued', 'processing'].includes(job.status)) throw new Error('Сначала отмени рендер');
+  fs.rmSync(job.outputDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+  jobs.delete(jobId);
+  return { id: jobId, deleted: true };
+}
+/** Remove every finished, failed or cancelled job; returns how many and how much space was freed. */
+function deleteFinishedJobs() {
+  let count = 0, bytes = 0;
+  for (const job of [...jobs.values()]) {
+    if (['queued', 'processing'].includes(job.status)) continue;
+    bytes += folderSize(job.outputDir);
+    deleteJob(job.id); count++;
+  }
+  return { count, bytes };
+}
+
 /** Stop a queued or running job; finished clips stay, the half-rendered ones are removed. */
 function cancelJob(jobId) {
   const job = jobs.get(jobId);
@@ -264,7 +293,7 @@ function cancelJob(jobId) {
     sendSSE(jobId, 'status', { status: 'cancelled', overallProgress: job.overallProgress });
   } else if (job.status === 'processing') {
     const control = controls.get(jobId);
-    if (control) { control.cancelled = true; control.procs.forEach(proc => { try { proc.kill(); } catch {} }); }
+    if (control) { control.cancelled = true; control.procs.forEach(killTree); }
   }
   return job;
 }
@@ -272,6 +301,8 @@ function cancelJob(jobId) {
 module.exports = {
   startRenderJob,
   cancelJob,
+  deleteJob,
+  deleteFinishedJobs,
   getJob,
   getAllJobs,
   addSSEClient,

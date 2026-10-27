@@ -80,12 +80,12 @@ async function launch(browser, port, { headless = false, url }) {
   for (let i = 0; i < 40; i++) {
     try { await fetch(`http://127.0.0.1:${port}/json/version`); return proc; } catch { await new Promise(r => setTimeout(r, 250)); }
   }
-  proc.kill();
+  require('./process').killTree(proc);
   throw new Error(`${browser.name} не запустился`);
 }
 async function closeBrowser(port, proc) {
   try { await cdp(port, 'Browser.close'); } catch {}
-  setTimeout(() => { try { proc?.kill(); } catch {} }, 1500);
+  setTimeout(() => require('./process').killTree(proc), 1500);
 }
 
 /* Which Google account is signed in: name, e-mail and photo, read from accounts.google.com inside the

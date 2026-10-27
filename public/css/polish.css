@@ -570,6 +570,12 @@ input[type=range] { accent-color: var(--lime); }
 /* ---------- Render queue ---------- */
 .render-job__actions { display: flex; align-items: center; gap: 10px; }
 .render-job__cancel { color: var(--danger); }
+.export-settings { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); }
+.export-settings .form-select { width: 100%; margin-top: 6px; }
+.render-job__size { margin-left: 10px; font-size: 12px; color: var(--faint); }
+.render-job__buttons { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+.render-job__delete { color: var(--danger); }
+#page-render .section-header { align-items: center; }
 .status-badge--cancelled { color: var(--muted); background: #ffffff0d; }
 .progress-info .progress-status { font-variant-numeric: tabular-nums; }
 .empty-state__icon { color: var(--faint); }

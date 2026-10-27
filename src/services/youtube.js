@@ -254,7 +254,7 @@ function cancel(id) {
   if (!job) return null;
   if (['starting', 'downloading'].includes(job.status)) {
     job.status = 'cancelled'; job.stage = 'Отменено';
-    job.proc?.kill();
+    require('./process').killTree(job.proc);
     // Partial streams are useless; remove the half-filled folder once the process lets go of it.
     setTimeout(() => fs.rm(job.dir, { recursive: true, force: true }, () => {}), 1500);
   }

@@ -15,9 +15,16 @@ test('20 minutes becomes exactly five complete clips, each with exactly two loca
     assert.equal(events[1].assetId, events[0].assetId);
   });
 });
-test('overlap terminates at the source end; small tails are retained', () => {
+test('overlap terminates at the source end; a short tail joins the last clip, a long one stays', () => {
   assert.equal(autoSlice(240,120,10).at(-1).end, 240);
-  assert.equal(autoSlice(241,120).at(-1).duration, 1);
+  // 26:20 in 2-minute clips: the 20 s leftover makes the 13th clip 2:20 instead of a 14th clip.
+  const merged = autoSlice(1580,120);
+  assert.equal(merged.length, 13);
+  assert.deepEqual([merged.at(-1).start, merged.at(-1).end, merged.at(-1).duration], [1440, 1580, 140]);
+  assert.equal(autoSlice(241,120).length, 2);
+  assert.equal(autoSlice(330,120).at(-1).duration, 90, 'a leftover of at least half a clip stays separate');
+  assert.equal(autoSlice(241,120,0,false).at(-1).duration, 1, 'merging can be switched off');
+  assert.equal(autoSlice(100,120).length, 1);
   for (const overlap of [120,130,-1,NaN]) assert.throws(() => autoSlice(500,120,overlap));
 });
 test('per-clip count, banner, timing and disabled overrides do not affect other clips', () => {

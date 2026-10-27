@@ -220,7 +220,21 @@ test('reaction template puts the webcam region on top and the video below, also 
   await renderClip(source,out,0,2,template,null);
   const info=await getVideoInfo(out);
   assert.ok(Math.abs(info.duration-1)<.15,`speed applies to the reaction layout: ${info.duration}`);
+  // Square pixels: a 9:16 frame must play as 9:16, not stretched by a leftover sample aspect ratio.
+  const sar=execFileSync('ffprobe',['-v','error','-select_streams','v:0','-show_entries','stream=width,height,sample_aspect_ratio','-of','csv=p=0',out],{windowsHide:true}).toString().trim();
+  assert.ok(/^180,320(,1:1|,N\/A)?$/.test(sar),`square pixels at 180x320: ${sar}`);
   const at=(x,y)=>[...ffmpeg(['-ss','0.3','-i',out,'-vf',`crop=2:2:${x}:${y}`,'-frames:v','1','-f','rawvideo','-pix_fmt','rgb24','pipe:1']).subarray(0,3)];
   assert.ok(at(90,60)[0]>180,`top shows the webcam: ${at(90,60)}`);
   assert.ok(at(90,230)[2]>180,`bottom shows the stream: ${at(90,230)}`);
+});
+
+test('export frame-rate cap turns a 60 fps recording into 30 fps clips', async t=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'vidcreator-fps-'));
+  t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const source=path.join(dir,'source.mp4'), out=path.join(dir,'out.mp4'), keep=path.join(dir,'keep.mp4');
+  ffmpeg(['-f','lavfi','-i','testsrc2=s=320x180:r=60:d=1','-c:v','libx264','-preset','ultrafast',source]);
+  await renderClip(source,out,0,1,{output:{width:180,height:320,preset:'ultrafast',fps:30},framing:{zoom:1}},null);
+  assert.equal(Math.round((await getVideoInfo(out)).fps),30);
+  await renderClip(source,keep,0,1,{output:{width:180,height:320,preset:'ultrafast',fps:0},framing:{zoom:1}},null);
+  assert.equal(Math.round((await getVideoInfo(keep)).fps),60,'0 keeps the source rate');
 });
