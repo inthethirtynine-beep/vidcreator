@@ -7,12 +7,16 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "test": "node --test test/*.test.js",
-    "setup:speech": "node scripts/setup-whisper.js base"
+    "setup:speech": "node scripts/setup-whisper.js base",
+    "icons:update": "node scripts/build-icons.js"
   },
   "keywords": ["video", "template", "ffmpeg", "clips"],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
+  "registries": {
+    "@icons0": "https://icons0.dev/r/{name}.json"
+  },
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^5.1.0",

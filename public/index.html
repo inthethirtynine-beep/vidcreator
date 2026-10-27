@@ -8,19 +8,20 @@
   <link rel="stylesheet" href="/css/styles.css">
   <link rel="stylesheet" href="/css/studio.css"><link rel="stylesheet" href="/css/canvas-editor.css">
   <link rel="stylesheet" href="/css/editor.css">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎬</text></svg>">
+  <link rel="stylesheet" href="/css/icons.css">
+  <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">
 </head>
 <body>
   <div class="app">
     <!-- ===== Navbar ===== -->
-<nav class="navbar"><a href="#" class="navbar__brand" onclick="navigate('home')"><div class="navbar__logo">v.</div><div class="studio-wordmark"><span class="navbar__title">VidCreator</span><small>CREATOR STUDIO</small></div></a><div class="nav-label">РАБОЧЕЕ ПРОСТРАНСТВО</div><div class="navbar__nav"><button class="nav-btn" data-page="home" onclick="navigate('home')"><span class="nav-btn__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 3v18M3 9h6M3 15h6M15 9l4 3-4 3z"/></svg></span><span>Видеостудия</span></button><button class="nav-btn" data-page="templates" onclick="navigate('templates')"><span class="nav-btn__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span><span>Мои шаблоны</span></button><button class="nav-btn" data-page="render" onclick="navigate('render')"><span class="nav-btn__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></svg></span><span>Экспорт и файлы</span></button></div><div class="navbar__actions"><div class="sidebar-note"><strong>Твоя студия. Твои правила.</strong>Из одного видео — серия клипов с твоим оформлением и рекламой.</div><div class="status-pill" id="engine-status"><span class="status-pill__dot"></span><span>Проверка FFmpeg…</span></div><div class="sidebar-footer"><span>Локальная студия</span><span>v.02</span></div></div></nav>
+<nav class="navbar"><a href="#" class="navbar__brand" onclick="navigate('home')"><div class="navbar__logo">v.</div><div class="studio-wordmark"><span class="navbar__title">VidCreator</span><small>CREATOR STUDIO</small></div></a><div class="nav-label">РАБОЧЕЕ ПРОСТРАНСТВО</div><div class="navbar__nav"><button class="nav-btn" data-page="home" onclick="navigate('home')"><span class="nav-btn__icon"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="film"><use href="/icons/bi.svg#bi-film"></use></svg></span><span>Видеостудия</span></button><button class="nav-btn" data-page="templates" onclick="navigate('templates')"><span class="nav-btn__icon"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="grid"><use href="/icons/bi.svg#bi-grid"></use></svg></span><span>Мои шаблоны</span></button><button class="nav-btn" data-page="render" onclick="navigate('render')"><span class="nav-btn__icon"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="download"><use href="/icons/bi.svg#bi-download"></use></svg></span><span>Экспорт и файлы</span></button></div><div class="navbar__actions"><div class="sidebar-note"><strong>Твоя студия. Твои правила.</strong>Из одного видео — серия клипов с твоим оформлением и рекламой.</div><div class="status-pill" id="engine-status"><span class="status-pill__dot"></span><span>Проверка FFmpeg…</span></div><div class="sidebar-footer"><span>Локальная студия</span><span>v.02</span></div></div></nav>
 
     <!-- ===== Main Content ===== -->
     <main class="main-content"><div class="studio-topbar"><span>Рабочее пространство <span style="margin:0 10px;color:#515c60">/</span> <strong id="studio-breadcrumb">Видеостудия</strong></span><span class="local-tag">LOCAL WORKSPACE</span></div>
 
       <!-- ========== HOME PAGE ========== -->
       <div id="page-home" class="page-view active">
-        <div class="studio-heading"><div><div class="eyebrow">MAKE EVERY CUT COUNT</div><h1>Длинное видео. Большие возможности.</h1><p>Нарезай, оформляй и добавляй рекламу — в одном месте.</p></div><span class="project-tag">YOUR NEXT GREAT VIDEO ↗</span></div>
+        <div class="studio-heading"><div><div class="eyebrow">MAKE EVERY CUT COUNT</div><h1>Длинное видео. Большие возможности.</h1><p>Нарезай, оформляй и добавляй рекламу — в одном месте.</p></div><span class="project-tag">YOUR NEXT GREAT VIDEO <svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="arrow-up-right"><use href="/icons/bi.svg#bi-arrow-up-right"></use></svg></span></div>
         <div class="studio-steps" aria-label="Этапы создания"><button class="studio-step active" onclick="studioStep(1)"><span>01</span>Исходник</button><button class="studio-step" onclick="studioStep(2)"><span>02</span>Оформление</button><button class="studio-step" onclick="studioStep(3)"><span>03</span>Нарезка</button><button class="studio-step" onclick="studioStep(4)"><span>04</span>Реклама и экспорт</button></div>
         <div class="studio-layout"><section class="studio-panel"><div class="panel-heading"><h2 id="studio-panel-title">Добавь исходное видео</h2><small id="studio-step-count">ШАГ 01 / 04</small></div><div class="workflow">
 
@@ -40,7 +41,7 @@
                 С компьютера
               </button>
               <button type="button" class="import-tab-btn" id="import-tab-yt" onclick="setImportMode('youtube')">
-                <span class="yt-logo-badge">▶</span> По ссылке YouTube
+                <span class="yt-logo-badge"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="play-fill"><use href="/icons/bi.svg#bi-play-fill"></use></svg></span> По ссылке YouTube
               </button>
             </div>
 
@@ -48,9 +49,9 @@
               <!-- Mode 1: File Upload -->
               <div id="import-file-panel">
                 <div class="upload-zone" id="upload-zone" role="button" tabindex="0" aria-label="Выбрать исходное видео" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('video-input').click()}">
-                  <div class="upload-zone__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 16V3m-5 5 5-5 5 5M4 15v6h16v-6"/></svg></div>
+                  <div class="upload-zone__icon"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="cloud-arrow-up"><use href="/icons/bi.svg#bi-cloud-arrow-up"></use></svg></div>
                   <div class="upload-zone__title">Перетащи видео в эту область</div>
-                  <div class="upload-zone__subtitle">или выбери файл на компьютере · до 5 ГБ</div><span class="browse-label">Выбрать видео ↗</span><div class="source-formats"><span>MP4</span><span>MOV</span><span>MKV</span><span>WEBM</span></div>
+                  <div class="upload-zone__subtitle">или выбери файл на компьютере · до 5 ГБ</div><span class="browse-label">Выбрать видео <svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="arrow-up-right"><use href="/icons/bi.svg#bi-arrow-up-right"></use></svg></span><div class="source-formats"><span>MP4</span><span>MOV</span><span>MKV</span><span>WEBM</span></div>
                   <input type="file" id="video-input" class="upload-zone__input" accept="video/*">
                 </div>
 
@@ -72,7 +73,7 @@
                 <div class="yt-card">
                   <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom: var(--space-xs);">
                     <div style="font-weight:700; font-size:1.05rem; display:flex; align-items:center; gap:8px;">
-                      <span class="yt-logo-badge">▶</span> Скачать видео с YouTube
+                      <span class="yt-logo-badge"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="play-fill"><use href="/icons/bi.svg#bi-play-fill"></use></svg></span> Скачать видео с YouTube
                     </div>
                     <span style="font-size:0.75rem; color:var(--text-muted); background:var(--surface-glass); padding:2px 8px; border-radius:4px;">
                       VidKraken API v2
@@ -92,14 +93,14 @@
                       <option value="480">480p (SD)</option>
                     </select>
                     <button class="btn btn--primary" id="yt-download-btn" onclick="startYouTubeDownload()" style="white-space:nowrap;">
-                      ⬇ Скачать
+                      <svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="download"><use href="/icons/bi.svg#bi-download"></use></svg> Скачать
                     </button>
                   </div>
 
                   <!-- Optional API Key toggle -->
                   <div style="margin-top: var(--space-sm);">
                     <span class="yt-api-toggle" onclick="toggleApiKeyInput()">
-                      ⚙️ Настройка API ключа <span id="yt-api-arrow">▼</span>
+                      <svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="gear"><use href="/icons/bi.svg#bi-gear"></use></svg> Настройка API ключа <span id="yt-api-arrow"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="chevron-down"><use href="/icons/bi.svg#bi-chevron-down"></use></svg></span>
                     </span>
                     <div id="yt-api-settings" style="display:none; margin-top: var(--space-xs);">
                       <input type="password" class="form-input" id="yt-api-key-input"
@@ -151,8 +152,8 @@
                     </div>
                   </div>
                   <div style="margin-top: var(--space-md); display: flex; gap: var(--space-sm);">
-                    <button class="btn btn--ghost btn--sm" onclick="removeVideo()">🗑️ Удалить</button>
-                    <button class="btn btn--primary btn--sm" onclick="activateStep(2)">Далее →</button>
+                    <button class="btn btn--ghost btn--sm" onclick="removeVideo()"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="trash3"><use href="/icons/bi.svg#bi-trash3"></use></svg> Удалить</button>
+                    <button class="btn btn--primary btn--sm" onclick="activateStep(2)">Далее <svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="arrow-right"><use href="/icons/bi.svg#bi-arrow-right"></use></svg></button>
                   </div>
                 </div>
               </div>
@@ -183,7 +184,7 @@
                 </div>
                 <div style="display:flex; gap: var(--space-sm);">
                   <button class="btn btn--ghost btn--sm" onclick="deselectTemplate()">Сменить</button>
-                  <button class="btn btn--primary btn--sm" onclick="activateStep(3)">Далее →</button>
+                  <button class="btn btn--primary btn--sm" onclick="activateStep(3)">Далее <svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="arrow-right"><use href="/icons/bi.svg#bi-arrow-right"></use></svg></button>
                 </div>
               </div>
             </div>
@@ -202,8 +203,8 @@
             <div class="card">
               <div class="slice-controls">
                 <div class="slice-mode-tabs">
-                  <button class="slice-mode-tab active" data-mode="auto" onclick="setSliceMode('auto')">⚡ Авто</button>
-                  <button class="slice-mode-tab" data-mode="count" onclick="setSliceMode('count')">По количеству</button><button class="slice-mode-tab" data-mode="manual" onclick="setSliceMode('manual')">✏️ Ручной</button>
+                  <button class="slice-mode-tab active" data-mode="auto" onclick="setSliceMode('auto')"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="lightning-charge"><use href="/icons/bi.svg#bi-lightning-charge"></use></svg> Авто</button>
+                  <button class="slice-mode-tab" data-mode="count" onclick="setSliceMode('count')">По количеству</button><button class="slice-mode-tab" data-mode="manual" onclick="setSliceMode('manual')"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="pencil"><use href="/icons/bi.svg#bi-pencil"></use></svg> Ручной</button>
                 </div>
               </div>
 
@@ -221,11 +222,11 @@
                 </div>
                 <div class="preset-chips">
                   <span class="preset-chips__label">Быстрые пресеты:</span>
-                  <button type="button" class="chip-btn" onclick="setPresetDuration(30)">⚡ 30 сек (Reels)</button>
-                  <button type="button" class="chip-btn" onclick="setPresetDuration(60)">⚡ 60 сек (Shorts)</button>
-                  <button type="button" class="chip-btn" onclick="setPresetDuration(90)">⚡ 90 сек</button>
-                  <button type="button" class="chip-btn active" onclick="setPresetDuration(120)">⚡ 2 мин</button>
-                  <button type="button" class="chip-btn" onclick="setPresetDuration(300)">⚡ 5 мин</button>
+                  <button type="button" class="chip-btn" onclick="setPresetDuration(30)"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="lightning-charge"><use href="/icons/bi.svg#bi-lightning-charge"></use></svg> 30 сек (Reels)</button>
+                  <button type="button" class="chip-btn" onclick="setPresetDuration(60)"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="lightning-charge"><use href="/icons/bi.svg#bi-lightning-charge"></use></svg> 60 сек (Shorts)</button>
+                  <button type="button" class="chip-btn" onclick="setPresetDuration(90)"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="lightning-charge"><use href="/icons/bi.svg#bi-lightning-charge"></use></svg> 90 сек</button>
+                  <button type="button" class="chip-btn active" onclick="setPresetDuration(120)"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="lightning-charge"><use href="/icons/bi.svg#bi-lightning-charge"></use></svg> 2 мин</button>
+                  <button type="button" class="chip-btn" onclick="setPresetDuration(300)"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="lightning-charge"><use href="/icons/bi.svg#bi-lightning-charge"></use></svg> 5 мин</button>
                 </div>
               </div>
 
@@ -269,7 +270,7 @@
             </div>
           </div>
           <div class="workflow__step" id="step-ads"><div id="ad-editor"></div></div>
-        </div></section><aside class="studio-panel preview-panel"><div class="panel-heading"><h2>Предпросмотр</h2><small id="preview-ratio">9:16</small></div><div class="preview-canvas"><div class="preview-frame" id="preview-frame"><div class="preview-empty" id="preview-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="m10 8 6 4-6 4z"/></svg><p>Твоя следующая история начинается здесь</p></div><video id="studio-video" playsinline muted></video><div class="preview-text" id="preview-text"></div><img class="preview-ad" id="preview-ad-image" alt="Рекламный баннер"><video class="preview-ad" id="preview-ad-video" playsinline muted></video><div class="preview-safe"></div></div></div><div class="preview-controls"><div class="preview-control-row"><button class="preview-play" id="preview-play" onclick="toggleStudioPlayback()" aria-label="Воспроизвести">▶</button><span id="preview-clock">00:00 / 00:00</span><span id="preview-clip-label">ИСХОДНИК</span></div><input id="preview-seek" type="range" min="0" max="100" step="0.05" value="0" aria-label="Позиция воспроизведения" oninput="seekStudio(this.value)"></div><div class="preview-footer"><span id="preview-format">Вертикальный формат</span><b id="preview-ad-status">Без рекламы</b></div></aside></div><div class="studio-bottom"><span>✦ Сделано для твоего творческого потока</span><span>Исходник → клипы → готово к публикации</span></div>
+        </div></section><aside class="studio-panel preview-panel"><div class="panel-heading"><h2>Предпросмотр</h2><small id="preview-ratio">9:16</small></div><div class="preview-canvas"><div class="preview-frame" id="preview-frame"><div class="preview-empty" id="preview-empty"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="film"><use href="/icons/bi.svg#bi-film"></use></svg><p>Твоя следующая история начинается здесь</p></div><video id="studio-video" playsinline muted></video><div class="preview-text" id="preview-text"></div><img class="preview-ad" id="preview-ad-image" alt="Рекламный баннер"><video class="preview-ad" id="preview-ad-video" playsinline muted></video><div class="preview-safe"></div></div></div><div class="preview-controls"><div class="preview-control-row"><button class="preview-play" id="preview-play" onclick="toggleStudioPlayback()" aria-label="Воспроизвести"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="play-fill"><use href="/icons/bi.svg#bi-play-fill"></use></svg></button><span id="preview-clock">00:00 / 00:00</span><span id="preview-clip-label">ИСХОДНИК</span></div><input id="preview-seek" type="range" min="0" max="100" step="0.05" value="0" aria-label="Позиция воспроизведения" oninput="seekStudio(this.value)"></div><div class="preview-footer"><span id="preview-format">Вертикальный формат</span><b id="preview-ad-status">Без рекламы</b></div></aside></div><div class="studio-bottom"><span><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="magic"><use href="/icons/bi.svg#bi-magic"></use></svg> Сделано для твоего творческого потока</span><span>Исходник → клипы → готово к публикации</span></div>
       </div>
 
       <!-- ========== TEMPLATES PAGE ========== -->
@@ -294,7 +295,7 @@
         <div id="template-editor-view" style="display:none;">
           <div class="section-header">
             <div style="display:flex; align-items:center; gap: var(--space-md);">
-              <button class="btn btn--ghost btn--icon" onclick="closeTemplateEditor()">←</button>
+              <button class="btn btn--ghost btn--icon" onclick="closeTemplateEditor()"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="arrow-left"><use href="/icons/bi.svg#bi-arrow-left"></use></svg></button>
               <div>
                 <input type="text" class="form-input" id="editor-template-name" value="Новый шаблон"
                   style="font-size: 1.2rem; font-weight: 700; background: transparent; border: none; padding: 0; color: var(--text-primary);"
@@ -303,7 +304,7 @@
               </div>
             </div>
             <div style="display:flex; gap: var(--space-sm);">
-              <button class="btn btn--secondary" onclick="saveCurrentTemplate()">💾 Сохранить</button>
+              <button class="btn btn--secondary" onclick="saveCurrentTemplate()"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="floppy"><use href="/icons/bi.svg#bi-floppy"></use></svg> Сохранить</button>
             </div>
           </div>
 
@@ -314,8 +315,8 @@
               <!-- Output Settings -->
               <div class="editor-section">
                 <div class="editor-section__header" onclick="toggleSection(this)">
-                  <div class="editor-section__title">📐 Выходной формат</div>
-                  <span class="editor-section__toggle">▼</span>
+                  <div class="editor-section__title"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="grid-3x3"><use href="/icons/bi.svg#bi-grid-3x3"></use></svg> Выходной формат</div>
+                  <span class="editor-section__toggle"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="chevron-down"><use href="/icons/bi.svg#bi-chevron-down"></use></svg></span>
                 </div>
                 <div class="editor-section__body">
                   <div class="form-group">
@@ -351,8 +352,8 @@
               <!-- Crop/Zoom -->
               <div class="editor-section">
                 <div class="editor-section__header" onclick="toggleSection(this)">
-                  <div class="editor-section__title">🔍 Кроп / Зум</div>
-                  <span class="editor-section__toggle">▼</span>
+                  <div class="editor-section__title"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="zoom-in"><use href="/icons/bi.svg#bi-zoom-in"></use></svg> Кроп / Зум</div>
+                  <span class="editor-section__toggle"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="chevron-down"><use href="/icons/bi.svg#bi-chevron-down"></use></svg></span>
                 </div>
                 <div class="editor-section__body">
                   <div class="form-group">
@@ -372,8 +373,8 @@
               <!-- Color Correction -->
               <div class="editor-section">
                 <div class="editor-section__header" onclick="toggleSection(this)">
-                  <div class="editor-section__title">🎨 Цветокоррекция</div>
-                  <span class="editor-section__toggle">▼</span>
+                  <div class="editor-section__title"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="palette"><use href="/icons/bi.svg#bi-palette"></use></svg> Цветокоррекция</div>
+                  <span class="editor-section__toggle"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="chevron-down"><use href="/icons/bi.svg#bi-chevron-down"></use></svg></span>
                 </div>
                 <div class="editor-section__body">
                   <div class="form-group">
@@ -403,8 +404,8 @@
               <!-- Text Overlays -->
               <div class="editor-section">
                 <div class="editor-section__header" onclick="toggleSection(this)">
-                  <div class="editor-section__title">✏️ Текстовые наложения</div>
-                  <span class="editor-section__toggle">▼</span>
+                  <div class="editor-section__title"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="pencil"><use href="/icons/bi.svg#bi-pencil"></use></svg> Текстовые наложения</div>
+                  <span class="editor-section__toggle"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="chevron-down"><use href="/icons/bi.svg#bi-chevron-down"></use></svg></span>
                 </div>
                 <div class="editor-section__body">
                   <div id="text-overlays-list">
@@ -419,8 +420,8 @@
               <!-- Watermark -->
               <div class="editor-section">
                 <div class="editor-section__header" onclick="toggleSection(this)">
-                  <div class="editor-section__title">💧 Водяной знак</div>
-                  <span class="editor-section__toggle">▼</span>
+                  <div class="editor-section__title"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="droplet"><use href="/icons/bi.svg#bi-droplet"></use></svg> Водяной знак</div>
+                  <span class="editor-section__toggle"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="chevron-down"><use href="/icons/bi.svg#bi-chevron-down"></use></svg></span>
                 </div>
                 <div class="editor-section__body">
                   <div class="toggle-row">
@@ -445,15 +446,15 @@
                     <div class="form-group">
                       <label class="form-label">Позиция</label>
                       <div class="position-grid" id="wm-position-grid">
-                        <div class="position-grid__cell" data-pos="tl" onclick="setWmPosition('tl')">↖</div>
-                        <div class="position-grid__cell" data-pos="tc" onclick="setWmPosition('tc')">↑</div>
-                        <div class="position-grid__cell" data-pos="tr" onclick="setWmPosition('tr')" >↗</div>
-                        <div class="position-grid__cell" data-pos="ml" onclick="setWmPosition('ml')">←</div>
-                        <div class="position-grid__cell" data-pos="mc" onclick="setWmPosition('mc')">•</div>
-                        <div class="position-grid__cell" data-pos="mr" onclick="setWmPosition('mr')">→</div>
-                        <div class="position-grid__cell" data-pos="bl" onclick="setWmPosition('bl')">↙</div>
-                        <div class="position-grid__cell" data-pos="bc" onclick="setWmPosition('bc')">↓</div>
-                        <div class="position-grid__cell active" data-pos="br" onclick="setWmPosition('br')">↘</div>
+                        <div class="position-grid__cell" data-pos="tl" onclick="setWmPosition('tl')"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="arrow-up-left"><use href="/icons/bi.svg#bi-arrow-up-left"></use></svg></div>
+                        <div class="position-grid__cell" data-pos="tc" onclick="setWmPosition('tc')"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="arrow-up"><use href="/icons/bi.svg#bi-arrow-up"></use></svg></div>
+                        <div class="position-grid__cell" data-pos="tr" onclick="setWmPosition('tr')" ><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="arrow-up-right"><use href="/icons/bi.svg#bi-arrow-up-right"></use></svg></div>
+                        <div class="position-grid__cell" data-pos="ml" onclick="setWmPosition('ml')"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="arrow-left"><use href="/icons/bi.svg#bi-arrow-left"></use></svg></div>
+                        <div class="position-grid__cell" data-pos="mc" onclick="setWmPosition('mc')"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="align-center"><use href="/icons/bi.svg#bi-align-center"></use></svg></div>
+                        <div class="position-grid__cell" data-pos="mr" onclick="setWmPosition('mr')"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="arrow-right"><use href="/icons/bi.svg#bi-arrow-right"></use></svg></div>
+                        <div class="position-grid__cell" data-pos="bl" onclick="setWmPosition('bl')"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="arrow-down-left"><use href="/icons/bi.svg#bi-arrow-down-left"></use></svg></div>
+                        <div class="position-grid__cell" data-pos="bc" onclick="setWmPosition('bc')"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="arrow-down"><use href="/icons/bi.svg#bi-arrow-down"></use></svg></div>
+                        <div class="position-grid__cell active" data-pos="br" onclick="setWmPosition('br')"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="arrow-down-right"><use href="/icons/bi.svg#bi-arrow-down-right"></use></svg></div>
                       </div>
                     </div>
                   </div>
@@ -463,8 +464,8 @@
               <!-- Transitions -->
               <div class="editor-section">
                 <div class="editor-section__header" onclick="toggleSection(this)">
-                  <div class="editor-section__title">✨ Переходы</div>
-                  <span class="editor-section__toggle">▼</span>
+                  <div class="editor-section__title"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="magic"><use href="/icons/bi.svg#bi-magic"></use></svg> Переходы</div>
+                  <span class="editor-section__toggle"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="chevron-down"><use href="/icons/bi.svg#bi-chevron-down"></use></svg></span>
                 </div>
                 <div class="editor-section__body">
                   <div class="form-group">
@@ -487,8 +488,8 @@
               <!-- Audio -->
               <div class="editor-section">
                 <div class="editor-section__header" onclick="toggleSection(this)">
-                  <div class="editor-section__title">🔊 Аудио</div>
-                  <span class="editor-section__toggle">▼</span>
+                  <div class="editor-section__title"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="volume-up"><use href="/icons/bi.svg#bi-volume-up"></use></svg> Аудио</div>
+                  <span class="editor-section__toggle"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="chevron-down"><use href="/icons/bi.svg#bi-chevron-down"></use></svg></span>
                 </div>
                 <div class="editor-section__body">
                   <div class="form-group">
@@ -522,14 +523,14 @@
                 <span class="preview-tag" id="preview-aspect-tag">9:16</span>
                 <span style="font-size:0.8rem; font-weight:600; color:var(--text-secondary);">Интерактивное превью</span>
                 <button type="button" class="btn btn--ghost btn--sm" onclick="toggleGridOverlay()" id="grid-toggle-btn" title="Включить/выключить сетку кадрирования 3x3">
-                  📐 Сетка
+                  <svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="grid-3x3"><use href="/icons/bi.svg#bi-grid-3x3"></use></svg> Сетка
                 </button>
               </div>
               <div class="preview-frame" id="preview-frame">
                 <!-- Video or background container -->
                 <div class="preview-frame__media" id="preview-media">
                   <div class="preview-frame__content" id="preview-content">
-                    <span style="font-size: 2.2rem;">🎬</span>
+                    <span style="font-size: 2.2rem;"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="film"><use href="/icons/bi.svg#bi-film"></use></svg></span>
                     <span style="font-weight:600;">Превью шаблона</span>
                     <span style="font-size: 0.75rem; color: var(--text-muted);">Изменения применяются на лету</span>
                   </div>
@@ -544,7 +545,7 @@
                 <div class="preview-text-layer" id="preview-text-layer"></div>
                 <!-- Watermark preview layer -->
                 <div class="preview-watermark-layer" id="preview-watermark-layer" style="display:none;">
-                  <span class="preview-wm-badge">💧 LOGO</span>
+                  <span class="preview-wm-badge"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="droplet"><use href="/icons/bi.svg#bi-droplet"></use></svg> LOGO</span>
                 </div>
               </div>
               <div class="preview-specs-card">
@@ -567,7 +568,7 @@
 
         <div id="render-jobs-list">
           <div class="empty-state" id="no-jobs-state">
-            <div class="empty-state__icon">🎥</div>
+            <div class="empty-state__icon"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="camera-video"><use href="/icons/bi.svg#bi-camera-video"></use></svg></div>
             <div class="empty-state__title">Нет активных задач</div>
             <div class="empty-state__text">Загрузи видео, выбери шаблон и запусти рендер на главной странице</div>
           </div>
@@ -584,17 +585,17 @@
       <div class="modal">
         <div class="modal__header">
           <h3 class="modal__title" id="confirm-modal-title">Подтверждение</h3>
-          <button class="modal__close" onclick="closeConfirmModal()">×</button>
+          <button class="modal__close" onclick="closeConfirmModal()" aria-label="Закрыть окно"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="x-lg"><use href="/icons/bi.svg#bi-x-lg"></use></svg></button>
         </div>
         <p id="confirm-modal-text" style="color: var(--text-secondary);">Вы уверены?</p>
         <div class="modal__footer">
-          <button class="btn btn--secondary" onclick="closeConfirmModal()">Отмена</button>
+          <button class="btn btn--secondary" onclick="closeConfirmModal()" aria-label="Закрыть окно">Отмена</button>
           <button class="btn btn--danger" id="confirm-modal-btn" onclick="confirmModalAction()">Удалить</button>
         </div>
       </div>
     </div>
   </div>
 
-  <script src="/js/ad-schedule.js"></script><script src="/js/app.js"></script><script src="/js/studio.js"></script><script src="/js/canvas-editor.js"></script><script src="/js/editor-model.js"></script><script src="/js/editor-app.js"></script><script src="/js/editor-tools.js"></script><script src="/js/editor-interactions.js"></script>
+  <script src="/js/icons.js"></script><script src="/js/ad-schedule.js"></script><script src="/js/app.js"></script><script src="/js/studio.js"></script><script src="/js/canvas-editor.js"></script><script src="/js/editor-model.js"></script><script src="/js/editor-app.js"></script><script src="/js/editor-tools.js"></script><script src="/js/editor-interactions.js"></script>
 </body>
 </html>

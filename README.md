@@ -80,6 +80,20 @@ node scripts/setup-whisper.js small --cuda
 
 ---
 
+## Иконки интерфейса
+
+Во всех панелях используется **Bootstrap Icons из [icons0 / `@icons0/bi`](https://icons0.dev/)**. Правила для дальнейших изменений закреплены в [AGENTS.md](AGENTS.md). Конфигурация реестра находится в `package.json`.
+
+В интерфейс загружается локальный SVG-спрайт `public/icons/bi.svg`; React, шрифты и внешние запросы для иконок не нужны. SVG наследуют цвет кнопки, а состояния воспроизведения, звука и видимости слоёв используют тот же набор. Лицензия MIT сохранена рядом со спрайтом.
+
+Для добавления иконки внеси её имя в `scripts/icons0-bi.json` и запусти:
+
+```powershell
+npm run icons:update
+```
+
+Команда устанавливает коллекцию через `npx shadcn@latest add @icons0/bi` в служебную папку `runtime/icons0/` и собирает выбранные иконки для обычного JavaScript. В шаблонах используй `uiIcon('scissors')`, для меняющейся иконки кнопки — `uiSetIcon(button, 'pause-fill')`. Декоративные SVG скрыты от скринридеров; кнопкам без текста задавай понятную подпись.
+
 ## 🛠️ Стек технологий
 
 - **Backend**: Node.js, Express 5, child_process (FFmpeg & ffprobe)

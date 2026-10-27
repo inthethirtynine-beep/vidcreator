@@ -6,6 +6,8 @@
 #page-editor{min-height:0;grid-template-rows:54px minmax(240px,1fr) 215px}
 .ed-time-button{border:0;background:none;color:#c2d3c2;font:9px var(--font-mono);cursor:pointer;padding:5px}.ed-time-button:hover{color:#d9fa75}
 .ed-field{display:block;min-width:0}.ed-field>.ed-label{display:block}
+.ed-body{grid-template-rows:minmax(0,1fr)}.ed-rail{min-height:0;overflow-y:auto;scrollbar-width:none}
+@media(max-height:720px){.ed-rail{padding-block:8px;gap:4px}.ed-rail button{min-height:43px}}
 .editor-open .navbar{position:fixed;inset:0 auto 0 0;height:100dvh;flex-direction:column;align-items:stretch;justify-content:flex-start}
 .editor-open .navbar__nav{flex-direction:column;margin-left:0}
 .ed-timeline-ad .ed-trim{position:absolute;top:0;bottom:0;right:0;width:8px;border:0;background:#d9fa7540;padding:0;cursor:ew-resize;touch-action:none}

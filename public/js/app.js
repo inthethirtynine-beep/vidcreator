@@ -46,12 +46,12 @@ function navigate(page) {
 
 function showToast(message, type = 'info') {
   const container = document.getElementById('toast-container');
-  const icons = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
+  const icons = { success: 'check-circle', error: 'x-circle', info: 'info-circle', warning: 'exclamation-triangle' };
 
   const toast = document.createElement('div');
   toast.className = `toast toast--${type}`;
   toast.innerHTML = `
-    <span class="toast__icon">${icons[type] || icons.info}</span>
+    <span class="toast__icon">${uiIcon(icons[type] || icons.info)}</span>
     <span class="toast__message">${escapeHtml(message)}</span>
   `;
 
@@ -227,10 +227,10 @@ function toggleApiKeyInput() {
   const arrow = document.getElementById('yt-api-arrow');
   if (panel.style.display === 'none') {
     panel.style.display = 'block';
-    arrow.textContent = '▲';
+    uiSetIcon(arrow, 'chevron-up');
   } else {
     panel.style.display = 'none';
-    arrow.textContent = '▼';
+    uiSetIcon(arrow, 'chevron-down');
   }
 }
 
@@ -263,7 +263,7 @@ async function startYouTubeDownload() {
   const apiKey = (apiKeyInput.value || '').trim();
 
   downloadBtn.disabled = true;
-  downloadBtn.textContent = '⏳ Запуск...';
+  downloadBtn.innerHTML = uiIcon('arrow-repeat') + ' Запуск…';
   progressArea.style.display = 'block';
   progressBar.style.width = '5%';
   progressTitle.textContent = 'Подключение к VidKraken...';
@@ -316,7 +316,7 @@ async function startYouTubeDownload() {
           setTimeout(() => {
             progressArea.style.display = 'none';
             downloadBtn.disabled = false;
-            downloadBtn.textContent = '⬇ Скачать';
+            downloadBtn.innerHTML = uiIcon('download') + ' Скачать';
             document.getElementById('upload-area').style.display = 'none';
             const switcher = document.querySelector('.import-switcher');
             if (switcher) switcher.style.display = 'none';
@@ -330,7 +330,7 @@ async function startYouTubeDownload() {
           clearInterval(ytPollInterval);
           ytPollInterval = null;
           downloadBtn.disabled = false;
-          downloadBtn.textContent = '⬇ Скачать';
+          downloadBtn.innerHTML = uiIcon('download') + ' Скачать';
           showToast('Ошибка загрузки: ' + (pollData.error || 'Сбой'), 'error');
           progressStatus.textContent = 'Ошибка: ' + (pollData.error || 'Сбой');
           return;
@@ -367,7 +367,7 @@ async function startYouTubeDownload() {
     if (ytPollInterval) clearInterval(ytPollInterval);
     ytPollInterval = null;
     downloadBtn.disabled = false;
-    downloadBtn.textContent = '⬇ Скачать';
+    downloadBtn.innerHTML = uiIcon('download') + ' Скачать';
     progressArea.style.display = 'none';
     showToast('Ошибка: ' + err.message, 'error');
   }
@@ -453,7 +453,7 @@ function renderTemplatesGrid(templates, containerId, showActions = false) {
     createCard.className = 'card card--create';
     createCard.onclick = () => createNewTemplate();
     createCard.innerHTML = `
-      <div class="card--create__icon">+</div>
+      <div class="card--create__icon">${uiIcon('plus-lg')}</div>
       <div class="card--create__label">Создать шаблон</div>
     `;
     container.appendChild(createCard);
@@ -472,9 +472,9 @@ function renderTemplatesGrid(templates, containerId, showActions = false) {
         <span class="template-card__date">${new Date(t.createdAt).toLocaleDateString('ru')}</span>
         <div class="template-card__actions">
           ${showActions ? `
-            <button class="btn btn--ghost btn--sm" onclick="event.stopPropagation(); editTemplate('${t.id}')" title="Редактировать">✏️</button>
-            <button class="btn btn--ghost btn--sm" onclick="event.stopPropagation(); duplicateTemplate('${t.id}')" title="Дублировать">📋</button>
-            <button class="btn btn--danger btn--sm" onclick="event.stopPropagation(); deleteTemplate('${t.id}')" title="Удалить">🗑️</button>
+            <button class="btn btn--ghost btn--sm" onclick="event.stopPropagation(); editTemplate('${t.id}')" title="Редактировать">${uiIcon('pencil')}</button>
+            <button class="btn btn--ghost btn--sm" onclick="event.stopPropagation(); duplicateTemplate('${t.id}')" title="Дублировать">${uiIcon('copy')}</button>
+            <button class="btn btn--danger btn--sm" onclick="event.stopPropagation(); deleteTemplate('${t.id}')" title="Удалить">${uiIcon('trash3')}</button>
           ` : `
             <button class="btn btn--primary btn--sm" onclick="event.stopPropagation(); selectTemplate('${t.id}')">Выбрать</button>
           `}
@@ -494,7 +494,7 @@ function renderTemplatesGrid(templates, containerId, showActions = false) {
   if (templates.length === 0 && !showActions) {
     container.innerHTML = `
       <div class="empty-state" style="grid-column: 1/-1;">
-        <div class="empty-state__icon">📐</div>
+        <div class="empty-state__icon">${uiIcon('grid-3x3')}</div>
         <div class="empty-state__title">Нет шаблонов</div>
         <div class="empty-state__text">Создай первый шаблон во вкладке "Шаблоны"</div>
         <button class="btn btn--primary" style="margin-top: var(--space-md);" onclick="navigate('templates')">Создать шаблон</button>
@@ -900,7 +900,7 @@ function renderTextOverlays(overlays) {
     item.innerHTML = `
       <div class="text-overlay-item__header">
         <span style="font-weight: 600; font-size: 0.85rem;">Текст #${i + 1}</span>
-        <button class="btn btn--ghost btn--sm" onclick="removeTextOverlay(${i})">✕</button>
+        <button class="btn btn--ghost btn--sm" onclick="removeTextOverlay(${i})" aria-label="Удалить текстовое наложение">${uiIcon('x-lg')}</button>
       </div>
       <div class="form-group">
         <label class="form-label">Текст</label>
@@ -1066,11 +1066,11 @@ function renderTimecodeRows() {
       <span class="timecode-row__index">#${i + 1}</span>
       <input type="text" class="form-input" style="width:100px" value="${formatTime(tc.start)}" placeholder="00:00:00"
         onchange="updateTimecode(${i}, 'start', this.value)">
-      <span style="color: var(--text-muted);">→</span>
+      <span style="color: var(--text-muted);">${uiIcon('arrow-right')}</span>
       <input type="text" class="form-input" style="width:100px" value="${formatTime(tc.end)}" placeholder="00:02:00"
         onchange="updateTimecode(${i}, 'end', this.value)">
       <span class="timecode-row__duration">${formatTime(tc.end - tc.start)}</span>
-      <button class="btn btn--ghost btn--sm" onclick="removeTimecodeRow(${i})">✕</button>
+      <button class="btn btn--ghost btn--sm" onclick="removeTimecodeRow(${i})" aria-label="Удалить интервал">${uiIcon('x-lg')}</button>
     `;
     container.appendChild(row);
   });
@@ -1209,7 +1209,7 @@ async function startRender() {
     showToast('Ошибка запуска: ' + err.message, 'error');
   } finally {
     btn.disabled = false;
-    btn.innerHTML = 'Экспортировать клипы ↗';
+    btn.innerHTML = 'Экспортировать клипы ' + uiIcon('arrow-up-right');
   }
 }
 
@@ -1314,7 +1314,7 @@ function renderJobsList(jobs) {
       ${job.errorsCount ? `<div class="render-error">Ошибки в ${job.errorsCount} клипах. Открой детали задачи для проверки.</div>` : ''}
       ${['completed', 'partial', 'error'].includes(job.status) ? `
         <div style="margin-top: var(--space-md);">
-          <button class="btn btn--primary btn--sm" onclick="viewJobResults('${job.id}')">📂 Показать файлы</button>
+          <button class="btn btn--primary btn--sm" onclick="viewJobResults('${job.id}')">${uiIcon('folder2-open')} Показать файлы</button>
         </div>
         <div class="results-grid" id="job-results-${job.id}" style="margin-top: var(--space-md); display: none;"></div>
       ` : ''}
@@ -1388,8 +1388,8 @@ async function viewJobResults(jobId) {
           <div class="result-card__meta">Исходник ${formatTime(file.start)} → ${formatTime(file.end)}<br>Итог: ${formatTime(file.outputDuration || file.duration)}</div>
         </div>
         <div class="result-card__actions">
-          <a href="${file.downloadUrl}" download class="btn btn--primary btn--sm">⬇ Скачать</a>
-          <button class="btn btn--secondary btn--sm" onclick="previewClip('${file.downloadUrl}')">▶ Играть</button>
+          <a href="${file.downloadUrl}" download class="btn btn--primary btn--sm">${uiIcon('download')} Скачать</a>
+          <button class="btn btn--secondary btn--sm" onclick="previewClip('${file.downloadUrl}')">${uiIcon('play-fill')} Играть</button>
         </div>
       `;
       container.appendChild(card);
