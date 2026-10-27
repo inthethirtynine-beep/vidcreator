@@ -47,7 +47,7 @@
 
 ```bash
 # 1. Клонирование репозитория
-git clone https://github.com/akaruma/vidcreator.git
+git clone https://github.com/inthethirtynine-beep/vidcreator.git
 cd vidcreator
 
 # 2. Установка зависимостей
