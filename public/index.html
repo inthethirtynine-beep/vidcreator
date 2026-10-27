@@ -30,6 +30,18 @@
           <span>Рендер</span>
         </button>
       </div>
+      <div class="navbar__actions">
+        <div class="status-pill" title="FFmpeg 8.1 готов к обработке видео">
+          <span class="status-pill__dot"></span>
+          <span>FFmpeg Ready</span>
+        </div>
+        <a href="https://github.com/inthethirtynine-beep/vidcreator" target="_blank" rel="noopener noreferrer" class="github-badge" title="Открыть репозиторий на GitHub">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+          </svg>
+          <span>GitHub</span>
+        </a>
+      </div>
     </nav>
 
     <!-- ===== Main Content ===== -->
@@ -233,6 +245,14 @@
                     <label class="form-label">Перекрытие (сек)</label>
                     <input type="number" class="form-input" id="segment-overlap" value="0" min="0" max="30" onchange="updateSlicePreview()">
                   </div>
+                </div>
+                <div class="preset-chips">
+                  <span class="preset-chips__label">Быстрые пресеты:</span>
+                  <button type="button" class="chip-btn" onclick="setPresetDuration(30)">⚡ 30 сек (Reels)</button>
+                  <button type="button" class="chip-btn" onclick="setPresetDuration(60)">⚡ 60 сек (Shorts)</button>
+                  <button type="button" class="chip-btn" onclick="setPresetDuration(90)">⚡ 90 сек</button>
+                  <button type="button" class="chip-btn active" onclick="setPresetDuration(120)">⚡ 2 мин</button>
+                  <button type="button" class="chip-btn" onclick="setPresetDuration(300)">⚡ 5 мин</button>
                 </div>
               </div>
 
@@ -523,16 +543,38 @@
 
             <!-- Preview area -->
             <div class="template-editor__preview">
+              <div class="preview-header-bar">
+                <span class="preview-tag" id="preview-aspect-tag">9:16</span>
+                <span style="font-size:0.8rem; font-weight:600; color:var(--text-secondary);">Интерактивное превью</span>
+                <button type="button" class="btn btn--ghost btn--sm" onclick="toggleGridOverlay()" id="grid-toggle-btn" title="Включить/выключить сетку кадрирования 3x3">
+                  📐 Сетка
+                </button>
+              </div>
               <div class="preview-frame" id="preview-frame">
-                <div class="preview-frame__content" id="preview-content">
-                  <span style="font-size: 2rem;">📱</span>
-                  <span>Превью шаблона</span>
-                  <span style="font-size: 0.7rem; color: var(--text-muted);">Загрузи видео для превью</span>
+                <!-- Video or background container -->
+                <div class="preview-frame__media" id="preview-media">
+                  <div class="preview-frame__content" id="preview-content">
+                    <span style="font-size: 2.2rem;">🎬</span>
+                    <span style="font-weight:600;">Превью шаблона</span>
+                    <span style="font-size: 0.75rem; color: var(--text-muted);">Изменения применяются на лету</span>
+                  </div>
+                </div>
+                <!-- Grid lines overlay -->
+                <div class="preview-grid-overlay" id="preview-grid" style="display:none;">
+                  <div></div><div></div><div></div>
+                  <div></div><div></div><div></div>
+                  <div></div><div></div><div></div>
+                </div>
+                <!-- Text Overlays live layer -->
+                <div class="preview-text-layer" id="preview-text-layer"></div>
+                <!-- Watermark preview layer -->
+                <div class="preview-watermark-layer" id="preview-watermark-layer" style="display:none;">
+                  <span class="preview-wm-badge">💧 LOGO</span>
                 </div>
               </div>
-              <div style="text-align: center;">
-                <div style="font-size: 0.8rem; color: var(--text-muted);">Формат: <span id="preview-aspect" style="color: var(--accent-light); font-weight: 600;">9:16</span></div>
-                <div style="font-size: 0.8rem; color: var(--text-muted);">Разрешение: <span id="preview-resolution" style="color: var(--accent-light); font-weight: 600;">1080×1920</span></div>
+              <div class="preview-specs-card">
+                <div>Формат: <span id="preview-aspect" style="color: var(--accent-light); font-weight: 700;">9:16</span></div>
+                <div>Разрешение: <span id="preview-resolution" style="color: var(--accent-light); font-weight: 700;">1080×1920</span></div>
               </div>
             </div>
           </div>

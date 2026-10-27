@@ -8,9 +8,10 @@ uploads/*
 renders/*
 !renders/.gitkeep
 
-# Environment variables
+# Environment variables & agent keys
 .env
 .env.local
+.agents/
 
 # Logs
 *.log
