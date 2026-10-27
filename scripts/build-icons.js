@@ -30,7 +30,7 @@ if (sourceArg < 0) {
 
 const names = require('./icons0-bi.json');
 const symbols = names.map(name => {
-  if (!/^[a-z0-9-]+$/.test(name)) throw new Error('Invalid icon name');
+  if (!/^[a-z0-9-]+-fill$/.test(name)) throw new Error('Only Bootstrap Fill / solid icons are allowed: ' + name);
   const content = fs.readFileSync(path.join(sourceRoot, 'components/icons/bi', name + '.tsx'), 'utf8');
   const match = content.match(/<svg\b[^>]*>([\s\S]*?)<\/svg>/);
   if (!match) throw new Error(`Missing SVG: ${name}`);
@@ -43,5 +43,5 @@ const output = path.join(root, 'public/icons');
 fs.mkdirSync(output, { recursive: true });
 const sprite = `<!-- Bootstrap Icons via icons0.dev / @icons0/bi. MIT. See LICENSE-bootstrap-icons.txt. -->\n<svg xmlns="http://www.w3.org/2000/svg">\n${symbols.join('\n')}\n</svg>\n`;
 fs.writeFileSync(path.join(output, 'bi.svg'), sprite);
-fs.writeFileSync(path.join(output, 'bi-manifest.json'), JSON.stringify({ registry, collection: '@icons0/bi', license: 'MIT', nativeViewBox: '0 0 16 16', sha256: crypto.createHash('sha256').update(sprite).digest('hex'), names }, null, 2) + '\n');
+fs.writeFileSync(path.join(output, 'bi-manifest.json'), JSON.stringify({ registry, collection: '@icons0/bi', style: 'fill', license: 'MIT', nativeViewBox: '0 0 16 16', sha256: crypto.createHash('sha256').update(sprite).digest('hex'), names }, null, 2) + '\n');
 console.log(`Built ${names.length} local icons (${Buffer.byteLength(sprite)} bytes).`);

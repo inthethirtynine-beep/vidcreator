@@ -127,7 +127,7 @@ function renderAdEditor() {
   const container = document.getElementById('ad-editor');
   container.innerHTML = `<label class="ad-toggle"><input type="checkbox" ${adConfig.enabled ? 'checked' : ''} onchange="adSet('enabled',this.checked);renderAdEditor();updateAdPlan()">Добавлять рекламные баннеры</label>
     <p class="ad-help">Баннер поверх видео, как в твоём примере. Каждый клип получает собственное расписание.</p>
-    <label class="btn btn--secondary" style="cursor:pointer;display:inline-flex">${uiIcon('plus-lg')} Загрузить баннер<input id="banner-upload" type="file" accept=".png,.jpg,.jpeg,.webp,.gif,.mp4,.webm,.mov" hidden onchange="uploadBanner(this.files[0])"></label>
+    <label class="btn btn--secondary" style="cursor:pointer;display:inline-flex">${uiIcon("plus-circle-fill")} Загрузить баннер<input id="banner-upload" type="file" accept=".png,.jpg,.jpeg,.webp,.gif,.mp4,.webm,.mov" hidden onchange="uploadBanner(this.files[0])"></label>
     <p class="ad-help">PNG с прозрачностью, JPG, WebP, GIF, MP4, WebM, MOV · до 100 МБ. Баннеры воспроизводятся без звука.</p>
     <div class="ad-library" id="ad-library"></div>
     <div class="ad-fields" ${adConfig.enabled ? '' : 'hidden'}>
@@ -138,14 +138,14 @@ function renderAdEditor() {
     <div class="form-row">${adNumber('ad-first','Первый показ, сек','firstStart',0,86400,.1)}${adNumber('ad-gap','Минимальная пауза, сек','minGap',0,3600,.1)}</div>
     <div class="form-row">${adNumber('ad-end','Отступ от конца, сек','endPadding',0,3600,.1)}<div class="form-group"><label class="form-label" for="ad-rotation">Чередование баннеров</label><select id="ad-rotation" class="form-select" onchange="adSet('rotation',this.value)"><option value="clip">Один баннер на клип</option><option value="show">Каждый показ — следующий</option><option value="fixed">Первый баннер для всех</option></select></div></div>
     <div class="form-row"><div class="form-group"><label class="form-label" for="ad-animation">Появление и уход</label><select id="ad-animation" class="form-select" onchange="adSet('animation',this.value)"><option value="fade">Плавное затухание</option><option value="slide-up">Слайд снизу</option><option value="slide-left">Слайд справа</option><option value="zoom">Мягкое масштабирование</option><option value="none">Без анимации</option></select></div>${adNumber('ad-fade','Длительность входа / ухода, сек','fade',0,3,.05)}</div>
-    <button class="btn btn--secondary" onclick="editBannerOnCanvas()">${uiIcon('cursor')} Изменить баннер в кадре</button>
+    <button class="btn btn--secondary" onclick="editBannerOnCanvas()">${uiIcon("cursor-fill")} Изменить баннер в кадре</button>
     <details class="ad-advanced"><summary class="ad-help">Точные параметры размера и позиции</summary>
     <div class="form-row">${adNumber('ad-width','Ширина, % кадра','width',10,100)}${adNumber('ad-opacity','Непрозрачность, 0–1','opacity',0,1,.05)}</div>
     <div class="form-row">${adNumber('ad-x','Центр по горизонтали, %','x',0,100)}${adNumber('ad-y','Центр по вертикали, %','y',0,100)}</div>
     </details>
     <p class="ad-help">Время показов задаётся по исходному содержимому каждой нарезки. При стоп-кадре дальнейшие моменты сдвигаются на время пауз; дорожка ниже показывает итоговое видео.</p></div>
     <div id="ad-validation" role="status" aria-live="polite"></div><div id="ad-clips"></div>
-    <div class="ad-toolbar"><button class="btn btn--ghost" onclick="studioStep(3)">${uiIcon('arrow-left')} Нарезка</button><button class="btn btn--primary" id="start-render-btn" onclick="startRender()">Экспортировать клипы ${uiIcon('arrow-up-right')}</button></div>`;
+    <div class="ad-toolbar"><button class="btn btn--ghost" onclick="studioStep(3)">${uiIcon("arrow-left-circle-fill")} Нарезка</button><button class="btn btn--primary" id="start-render-btn" onclick="startRender()">Экспортировать клипы ${uiIcon("arrow-up-right-circle-fill")}</button></div>`;
   document.getElementById('ad-rotation').value = adConfig.rotation;
   document.getElementById('ad-animation').value = adConfig.animation;
   const usedIds=[...adConfig.assetIds,...Object.values(adConfig.clips).flatMap(c=>c.assetIds||[])];
@@ -209,7 +209,7 @@ function renderAdClips() {
     const resultDuration = AdSchedule.outputDuration(segment.duration, sourceEvents);
     const row = document.createElement('div'); row.className = 'ad-clip-row';
     const override = adConfig.clips[index] || {};
-    row.innerHTML = `<div class="ad-clip-head"><span>Клип ${String(index + 1).padStart(2,'0')} <span style="color:#78888b">· ${formatTime(resultDuration)}${resultDuration > segment.duration ? ` (+${Math.round((resultDuration-segment.duration)*100)/100}с рекламы)` : ''}</span></span><button onclick="selectPreviewClip(${index})">Смотреть ${uiIcon('arrow-up-right')}</button></div><div class="ad-track" title="Нажми на показ для предпросмотра"></div>
+    row.innerHTML = `<div class="ad-clip-head"><span>Клип ${String(index + 1).padStart(2,'0')} <span style="color:#78888b">· ${formatTime(resultDuration)}${resultDuration > segment.duration ? ` (+${Math.round((resultDuration-segment.duration)*100)/100}с рекламы)` : ''}</span></span><button onclick="selectPreviewClip(${index})">Смотреть ${uiIcon("arrow-up-right-circle-fill")}</button></div><div class="ad-track" title="Нажми на показ для предпросмотра"></div>
       <details data-clip="${index}" ${open.includes(String(index)) ? 'open' : ''}><summary class="ad-help" style="cursor:pointer">Настроить этот клип ${Object.keys(override).length ? '• изменён' : ''}</summary><div class="ad-clip-detail">
       <label>Показы (пусто — общие настройки)<input class="form-input" type="number" min="0" max="20" value="${override.count ?? ''}" onchange="setClipAd(${index},'count',this.value)"></label>
       <label>Баннер<select class="form-select" onchange="setClipAd(${index},'assetIds',this.value)"><option value="">По общему правилу</option>${bannerAssets.map(a => `<option value="${a.id}" ${override.assetIds?.[0] === a.id ? 'selected' : ''}>${escapeHtml(a.name)}</option>`).join('')}</select></label>
