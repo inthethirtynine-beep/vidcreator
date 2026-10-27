@@ -184,6 +184,11 @@ test('speed retimes picture and sound; rounded corners and shadow decorate the f
   await renderClip(source,ad,0,1,{output:{width:180,height:320,preset:'ultrafast'}},null,events);
   assert.ok(at(ad,90,160,.5)[1]>180,'banner centre is drawn');
   assert.ok(at(ad,38,108,.5)[1]<150,'banner corner is rounded off');
+  // A 94%-wide banner with a strong shadow stays centred: its shadow padding may spill past the frame.
+  const wide=plan({enabled:true,assetIds:['b'],count:1,firstStart:.2,duration:.6,endPadding:.1,fade:0,width:94,x:50,y:50,freezeOnAd:false,radius:0,shadow:100},[{duration:1}],()=>({animated:false}))[0].map(e=>({...e,asset:{filePath:banner,animated:false,width:400,height:100}}));
+  const centred=path.join(dir,'centred.mp4');
+  await renderClip(source,centred,0,1,{output:{width:180,height:320,preset:'ultrafast'}},null,wide);
+  assert.ok(at(centred,10,160,.5)[1]>180&&at(centred,168,160,.5)[1]>180,`banner covers both sides evenly: ${at(centred,10,160,.5)} / ${at(centred,168,160,.5)}`);
 });
 
 test('a render job applies the chosen speed to every clip, not just the first', async t=>{

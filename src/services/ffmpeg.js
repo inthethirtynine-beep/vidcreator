@@ -441,7 +441,7 @@ async function renderClip(inputPath, outputPath, startTime, duration, template, 
       const h = Math.max(2, Math.round((template.output?.height || 1920) / 2) * 2);
       const aspect = event.asset?.width && event.asset?.height ? event.asset.width / event.asset.height : null;
       const decorated = aspect && (event.radius > 0 || event.shadow > 0);
-      let adFilter;
+      let adFilter, pad = 0;
       if (decorated) {
         // Exact banner size (needed for the corner mask), then rounded corners / shadow, then animation.
         const bw = Math.max(2, Math.round(Math.min(w, h * aspect) / 2) * 2), bh = Math.max(2, Math.round(Math.min(h, w / aspect) / 2) * 2);
@@ -449,6 +449,7 @@ async function renderClip(inputPath, outputPath, startTime, duration, template, 
         const deco = decorate(`adbase${i}`, bw, bh, { radius: event.radius, shadow: event.shadow }, `addeco${i}`, template.output?.width || 1080);
         finalFilter += ';' + deco.filters.join(';');
         adFilter = `[${deco.label}]null`;
+        pad = deco.margin;
       } else {
         adFilter = `[${input}:v]setpts=PTS-STARTPTS,scale=w=${w}:h=${h}:force_original_aspect_ratio=decrease,format=rgba,colorchannelmixer=aa=${event.opacity},trim=duration=${event.duration}`;
       }
@@ -460,8 +461,10 @@ async function renderClip(inputPath, outputPath, startTime, duration, template, 
       const progress = event.fade > 0 ? `max(0,min(1,min((t-${event.start})/${event.fade},(${event.start + event.duration}-t)/${event.fade})))` : '1';
       // Smoothstep gives the slide a soft start and stop, within the creative's duration.
       const eased = `(${progress})*(${progress})*(3-2*(${progress}))`;
-      const x = `max(0,min(W-w,W*${event.x / 100}-w/2))${event.animation === 'slide-left' ? `+W*0.1*(1-(${eased}))` : ''}`;
-      const y = `max(0,min(H-h,H*${event.y / 100}-h/2))${event.animation === 'slide-up' ? `+H*0.08*(1-(${eased}))` : ''}`;
+      // The shadow margin is transparent padding: keep the banner itself inside the frame, not its padding,
+      // so a wide banner with a shadow stays centred where it was placed.
+      const x = `max(${-pad},min(W-w+${pad},W*${event.x / 100}-w/2))${event.animation === 'slide-left' ? `+W*0.1*(1-(${eased}))` : ''}`;
+      const y = `max(${-pad},min(H-h+${pad},H*${event.y / 100}-h/2))${event.animation === 'slide-up' ? `+H*0.08*(1-(${eased}))` : ''}`;
       finalFilter += `;${adFilter};[${label}][ad${i}]overlay=x='${x}':y='${y}':enable='gte(t,${event.start})*lt(t,${event.start + event.duration})':eof_action=pass:repeatlast=0[advert${i}]`;
       label = `advert${i}`;
     });
