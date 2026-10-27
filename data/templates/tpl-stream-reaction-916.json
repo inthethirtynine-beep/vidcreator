@@ -1,0 +1,67 @@
+{
+  "id": "tpl-stream-reaction-916",
+  "name": "Реакция стримера: вебка сверху (9:16)",
+  "description": "Из записи стрима 16:9 с вебкой в углу: вебка стримера сверху, видео снизу. Области вебки и видео настраиваются на шаге «Оформление».",
+  "createdAt": "2026-10-27T00:00:00.000Z",
+  "updatedAt": "2026-10-27T00:00:00.000Z",
+  "reaction": true,
+  "output": {
+    "width": 1080,
+    "height": 1920,
+    "aspectRatio": "9:16",
+    "preset": "fast",
+    "crf": 22,
+    "audioBitrate": "192k"
+  },
+  "composition": {
+    "background": "#0b0d0e",
+    "layers": [
+      {
+        "id": "content",
+        "name": "Видео",
+        "enabled": true,
+        "locked": false,
+        "crop": { "x": 0, "y": 0, "w": 1, "h": 1 },
+        "rect": { "x": 0, "y": 0.4, "w": 1, "h": 0.6 },
+        "fit": "cover",
+        "mask": "rect",
+        "opacity": 1,
+        "flip": false
+      },
+      {
+        "id": "camera",
+        "name": "Вебка",
+        "enabled": true,
+        "locked": false,
+        "crop": { "x": 0.727, "y": 0.725, "w": 0.263, "h": 0.272 },
+        "rect": { "x": 0, "y": 0, "w": 1, "h": 0.4 },
+        "fit": "cover",
+        "mask": "rect",
+        "opacity": 1,
+        "flip": false
+      }
+    ]
+  },
+  "colorCorrection": {
+    "brightness": 0,
+    "contrast": 1.04,
+    "saturation": 1.08
+  },
+  "textOverlays": [],
+  "watermark": {
+    "enabled": false,
+    "path": "",
+    "x": "W-w-30",
+    "y": "30",
+    "opacity": 0.8
+  },
+  "transitions": {
+    "fadeIn": 0.2,
+    "fadeOut": 0.2
+  },
+  "audio": {
+    "volume": 1,
+    "fadeIn": 0.1,
+    "fadeOut": 0.3
+  }
+}

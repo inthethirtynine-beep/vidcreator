@@ -8,6 +8,7 @@
     "dev": "node --watch server.js",
     "test": "node --test test/*.test.js",
     "setup:speech": "node scripts/setup-whisper.js base",
+    "setup:youtube": "node scripts/setup-ytdlp.js",
     "icons:update": "node scripts/build-icons.js"
   },
   "keywords": ["video", "template", "ffmpeg", "clips"],

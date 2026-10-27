@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const path = require('path');
 const fs = require('fs');
-const { startRenderJob, getJob, getAllJobs, addSSEClient, removeSSEClient } = require('../services/renderer');
+const { startRenderJob, getJob, getAllJobs, addSSEClient, removeSSEClient, cancelJob } = require('../services/renderer');
 
 const UPLOADS_DIR = path.join(__dirname, '../../uploads');
 const TEMPLATES_DIR = path.join(__dirname, '../../data/templates');
@@ -10,7 +10,7 @@ const TEMPLATES_DIR = path.join(__dirname, '../../data/templates');
 // POST /api/render/start — start a render job
 router.post('/start', async (req, res) => {
   try {
-    const { videoId, templateId, sliceConfig, adConfig } = req.body;
+    const { videoId, templateId, sliceConfig, adConfig, framing, reaction } = req.body;
 
     if (!videoId || !templateId) {
       return res.status(400).json({ error: 'videoId and templateId are required' });
@@ -37,6 +37,21 @@ router.post('/start', async (req, res) => {
       return res.status(404).json({ error: 'Template not found' });
     }
     const template = JSON.parse(fs.readFileSync(templatePath, 'utf-8'));
+    // Reaction templates: the webcam and video regions chosen for this source, and how tall the top part is.
+    if (template.composition && reaction && typeof reaction === 'object') {
+      const { crop, clamp } = require('../../public/js/editor-model');
+      const split = clamp(Number(reaction.split) || .4, .15, .7);
+      template.composition = { ...template.composition, layers: template.composition.layers.map(layer => {
+        if (layer.id === 'camera') return { ...layer, crop: crop(reaction.camera || layer.crop), rect: { x: 0, y: 0, w: 1, h: split } };
+        if (layer.id === 'content') return { ...layer, crop: crop(reaction.content || layer.crop), rect: { x: 0, y: split, w: 1, h: 1 - split } };
+        return layer;
+      }) };
+    }
+    // Studio framing (zoom / pan / background) for this source overrides the template's crop.
+    if (framing && typeof framing === 'object') {
+      const n = (v, min, max, d) => Number.isFinite(Number(v)) ? Math.max(min, Math.min(max, Number(v))) : d;
+      template.framing = { zoom: n(framing.zoom, 0, 1.5, 1), x: n(framing.x, 0, 1, .5), y: n(framing.y, 0, 1, .5), background: framing.background === 'black' ? 'black' : 'blur', blur: n(framing.blur, 0, 100, 50), opacity: n(framing.opacity, 0, 1, .8), radius: n(framing.radius, 0, 100, 0), shadow: n(framing.shadow, 0, 100, 0), speed: n(framing.speed, .25, 4, 1) };
+    }
 
     // Start render job
     const job = await startRenderJob(videoPath, template, sliceConfig || { mode: 'auto', segmentDuration: 120 }, adConfig);
@@ -53,6 +68,9 @@ router.post('/start', async (req, res) => {
 });
 
 // GET /api/render/jobs — list all render jobs
+// GET /api/render/engine — which encoder renders and how many clips run at once
+router.get('/engine', async (req, res) => res.json(await require('../services/encoder').info()));
+
 router.get('/jobs', (req, res) => {
   res.json(getAllJobs());
 });
@@ -82,6 +100,13 @@ router.get('/jobs/:id', (req, res) => {
   });
 });
 
+// POST /api/render/jobs/:id/cancel — stop a queued or running render
+router.post('/jobs/:id/cancel', (req, res) => {
+  const job = cancelJob(req.params.id);
+  if (!job) return res.status(404).json({ error: 'Job not found' });
+  res.json({ id: job.id, status: job.status });
+});
+
 // GET /api/render/jobs/:id/progress — SSE progress stream
 router.get('/jobs/:id/progress', (req, res) => {
   const job = getJob(req.params.id);
@@ -101,6 +126,9 @@ router.get('/jobs/:id/progress', (req, res) => {
     overallProgress: job.overallProgress,
     currentSegment: job.currentSegment,
     totalSegments: job.totalSegments,
+    etaSeconds: job.etaSeconds ?? null,
+    doneSegments: job.doneSegments ?? job.results.length,
+    encoder: job.encoder || null,
   })}\n\n`);
 
   addSSEClient(req.params.id, res);

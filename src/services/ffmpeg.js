@@ -58,10 +58,14 @@ function getVideoInfo(filePath) {
         const videoStream = info.streams.find(s => s.codec_type === 'video');
         const audioStream = info.streams.find(s => s.codec_type === 'audio');
 
+        // Phone videos are often stored sideways with a rotation flag; FFmpeg turns the frames upright,
+        // so report the size as it is displayed.
+        const rotation = Number(videoStream?.tags?.rotate ?? videoStream?.side_data_list?.find(d => d.rotation !== undefined)?.rotation ?? 0);
+        const sideways = Math.abs(rotation) % 180 === 90;
         resolve({
           duration: parseFloat(info.format.duration),
-          width: videoStream ? videoStream.width : 0,
-          height: videoStream ? videoStream.height : 0,
+          width: videoStream ? (sideways ? videoStream.height : videoStream.width) : 0,
+          height: videoStream ? (sideways ? videoStream.width : videoStream.height) : 0,
           fps: videoStream ? (() => { const [n, d = 1] = videoStream.r_frame_rate.split('/').map(Number); return n / d || 30; })() : 30,
           codec: videoStream ? videoStream.codec_name : 'unknown',
           audioCodec: audioStream ? audioStream.codec_name : null,
@@ -103,6 +107,36 @@ function generateThumbnail(inputPath, outputPath, timeSeconds = 1) {
 }
 
 /**
+ * Loudness envelope for the editor waveform: the peak of each 1/rate-second
+ * window, 0–100. Decoded at 8 kHz mono, so even long sources stay small.
+ */
+function audioPeaks(inputPath, rate = 50) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('ffmpeg', ['-v', 'error', '-i', inputPath, '-vn', '-ac', '1', '-ar', '8000', '-f', 's16le', 'pipe:1'], { windowsHide: true });
+    const window = Math.round(8000 / rate), peaks = [];
+    let peak = 0, filled = 0, carry = null, stderr = '';
+    proc.stdout.on('data', chunk => {
+      if (carry) { chunk = Buffer.concat([carry, chunk]); carry = null; }
+      const even = chunk.length - (chunk.length % 2);
+      if (even < chunk.length) carry = chunk.subarray(even);
+      for (let i = 0; i < even; i += 2) {
+        const sample = Math.abs(chunk.readInt16LE(i));
+        if (sample > peak) peak = sample;
+        if (++filled === window) { peaks.push(Math.round(peak / 327.67)); peak = 0; filled = 0; }
+      }
+    });
+    proc.stderr.on('data', data => { stderr += data.toString(); });
+    proc.on('close', code => {
+      if (filled) peaks.push(Math.round(peak / 327.67));
+      // A source without an audio stream is not an error: it simply has no waveform.
+      if (code !== 0 && !/does not contain any stream|matches no streams/i.test(stderr) && !peaks.length) return reject(new Error(`Waveform failed: ${stderr.slice(-300)}`));
+      resolve({ rate, peaks });
+    });
+    proc.on('error', reject);
+  });
+}
+
+/**
  * Generate multiple thumbnails for timeline preview
  */
 async function generateTimelineThumbnails(inputPath, outputDir, count = 20) {
@@ -123,6 +157,33 @@ async function generateTimelineThumbnails(inputPath, outputDir, count = 20) {
 /**
  * Build FFmpeg filter complex for template application
  */
+/**
+ * Rounded corners and a soft drop shadow for a w×h picture (the framed video or a banner).
+ * radius/shadow are 0–100. The corner mask is a single generated frame that alphamerge repeats for
+ * the whole clip; the shadow is a blurred black copy with a margin, so it is not clipped. The result
+ * is (w + 2·margin) × (h + 2·margin) with the picture centred, ready for a centred overlay.
+ */
+function decorate(input, w, h, { radius = 0, shadow = 0 } = {}, tag, frameWidth) {
+  const filters = [];
+  let label = input, margin = 0;
+  const r = Math.round(Math.max(0, Math.min(100, radius)) / 100 * Math.min(w, h) / 2);
+  if (r > 0) {
+    filters.push(`color=c=black:s=${w}x${h}:d=1:r=1,format=gray,geq=lum='255*clip(${r}+0.5-hypot(max(abs(X-W/2+0.5)-(W/2-${r}),0),max(abs(Y-H/2+0.5)-(H/2-${r}),0)),0,1)'[${tag}mask]`);
+    filters.push(`[${label}]format=rgba[${tag}rgba]`, `[${tag}rgba][${tag}mask]alphamerge[${tag}round]`);
+    label = `${tag}round`;
+  }
+  if (shadow > 0) {
+    const s = Math.min(100, shadow) / 100, sigma = frameWidth * (.006 + .02 * s), opacity = (.2 + .5 * s).toFixed(2);
+    margin = Math.ceil(sigma * 3);
+    const drop = Math.round(sigma * .6);
+    filters.push(`[${label}]format=rgba,split[${tag}top][${tag}copy]`);
+    filters.push(`[${tag}copy]colorchannelmixer=rr=0:gg=0:bb=0:aa=${opacity},pad=iw+${margin * 2}:ih+${margin * 2}:${margin}:${margin}:color=black@0,gblur=sigma=${sigma.toFixed(1)}[${tag}shadow]`);
+    filters.push(`[${tag}shadow][${tag}top]overlay=${margin}:${margin - drop}:format=auto[${tag}done]`);
+    label = `${tag}done`;
+  }
+  return { filters, label, margin };
+}
+
 function buildFilterComplex(template, videoInfo) {
   const filters = [];
   let currentLabel = '0:v';
@@ -130,9 +191,56 @@ function buildFilterComplex(template, videoInfo) {
 
   const outputWidth = template.output?.width || 1080;
   const outputHeight = template.output?.height || 1920;
+  // Playback speed from the studio (0.25–4×): retime the picture first, keep a steady frame rate.
+  const speed = Number(template.framing?.speed) || 1;
+  if (Math.abs(speed - 1) > .001) {
+    filters.push(`[0:v]setpts=PTS/${speed}${template._fps ? `,fps=${Math.min(60, Math.round(template._fps * 1000) / 1000)}` : ''}[speedv]`);
+    currentLabel = 'speedv';
+  }
   if(template.composition){
-    const composed=require('./compositor').compose(template.composition,outputWidth,outputHeight);
+    const composed=require('./compositor').compose(template.composition,outputWidth,outputHeight,currentLabel);
     filters.push(...composed.filters);currentLabel=composed.label;
+  } else if (template.framing) {
+    // 1. Framing chosen in the studio: zoom 0 shows the whole source, 1 fills the frame, >1 zooms in.
+    // The source is scaled between the "fit" and "fill" sizes, panned by x/y, optionally given rounded
+    // corners and a drop shadow, and placed on a blurred copy of itself (or black).
+    const f = template.framing, W = outputWidth, H = outputHeight;
+    const zoom = Math.max(0, Math.min(1.5, Number(f.zoom ?? 1))), x = Math.max(0, Math.min(1, Number(f.x ?? .5))), y = Math.max(0, Math.min(1, Number(f.y ?? .5)));
+    const radius = Math.max(0, Math.min(100, Number(f.radius) || 0)), shadow = Math.max(0, Math.min(100, Number(f.shadow) || 0));
+    const src = f._source;
+    let foreground, fgW, fgH;
+    if (src?.width && src?.height) {
+      // Exact pixel sizes (same formula as the preview), so the corner mask matches the picture.
+      const fit = Math.min(W / src.width, H / src.height), fill = Math.max(W / src.width, H / src.height), scale = fit * Math.pow(fill / fit, zoom);
+      const sw = Math.max(2, Math.round(src.width * scale / 2) * 2), sh = Math.max(2, Math.round(src.height * scale / 2) * 2);
+      fgW = Math.min(sw, W); fgH = Math.min(sh, H);
+      foreground = `scale=${sw}:${sh}:flags=lanczos,crop=${fgW}:${fgH}:${Math.round((sw - fgW) * x)}:${Math.round((sh - fgH) * y)},setsar=1`;
+    } else {
+      const fit = `min(${W}/iw,${H}/ih)`, fill = `max(${W}/iw,${H}/ih)`, scale = `${fit}*pow(${fill}/${fit},${zoom})`;
+      foreground = `scale=w='max(2,trunc(iw*${scale}/2)*2)':h='max(2,trunc(ih*${scale}/2)*2)':flags=lanczos,crop=w='min(iw,${W})':h='min(ih,${H})':x='(iw-ow)*${x}':y='(ih-oh)*${y}',setsar=1`;
+    }
+    const decorated = fgW && (radius > 0 || shadow > 0);
+    if (!decorated && (f.background === 'black' || zoom >= 1)) {
+      filters.push(`[${currentLabel}]${foreground},pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2:color=black[framed]`);
+    } else {
+      // Background = the source covering the frame, blurred on a quarter-size copy (cheap), then
+      // dimmed toward black by its opacity (fully black for the "black" background).
+      // Blur radius is a share of the frame width, as in the preview.
+      const bw = Math.max(2, Math.round(W / 8) * 2), bh = Math.max(2, Math.round(H / 8) * 2);
+      const black = f.background === 'black';
+      const blur = black ? 0 : Math.max(0, Math.min(100, Number(f.blur ?? 50))), opacity = black ? 0 : Math.max(0, Math.min(1, Number(f.opacity ?? .8)));
+      const sigma = blur / 100 * .06 * bw;
+      filters.push(`[${currentLabel}]split=2[framebg][framefg]`);
+      filters.push(`[framebg]scale=${bw}:${bh}:force_original_aspect_ratio=increase,crop=${bw}:${bh}${sigma > .2 ? `,gblur=sigma=${sigma.toFixed(2)}` : ''},colorchannelmixer=rr=${opacity}:gg=${opacity}:bb=${opacity},scale=${W}:${H},setsar=1[frameblur]`);
+      filters.push(`[framefg]${foreground}[framefront]`);
+      let front = 'framefront';
+      if (decorated) {
+        const deco = decorate(front, fgW, fgH, { radius, shadow }, 'framedeco', W);
+        filters.push(...deco.filters); front = deco.label;
+      }
+      filters.push(`[frameblur][${front}]overlay=x='(W-w)/2':y='(H-h)/2'[framed]`);
+    }
+    currentLabel = 'framed';
   } else {
 
   // 1. Crop/Zoom — extract region from source and scale to output
@@ -222,7 +330,13 @@ function buildFilterComplex(template, videoInfo) {
  * Render a single clip with template applied
  * Returns a progress emitter
  */
-async function renderClip(inputPath, outputPath, startTime, duration, template, onProgress, adEvents = []) {
+/**
+ * options.control: { procs: Set } — the caller can kill running ffmpeg processes to cancel.
+ * options.encoder: force an encoder kind ('cpu' is used to retry after a GPU failure).
+ */
+async function renderClip(inputPath, outputPath, startTime, duration, template, onProgress, adEvents = [], options = {}) {
+  const encoder = require('./encoder');
+  const kind = options.encoder || await encoder.detect();
   const hasHolds = adEvents.some(event => event.freeze);
   // Video banners keep their own soundtrack (unless switched off); probe each file once.
   const probes = new Map();
@@ -232,8 +346,14 @@ async function renderClip(inputPath, outputPath, startTime, duration, template, 
     if (!probes.has(file)) probes.set(file, getVideoInfo(file).then(info => !!info.audioCodec).catch(() => false));
     return probes.get(file);
   }));
-  const inputInfo = hasHolds || adHasAudio.some(Boolean) ? await getVideoInfo(inputPath) : null;
-  const finalDuration = outputDuration(duration, adEvents);
+  const speed = Math.max(.25, Math.min(4, Number(template.framing?.speed) || 1));
+  const inputInfo = hasHolds || adHasAudio.some(Boolean) || template.framing ? await getVideoInfo(inputPath) : null;
+  // `duration` is source time; after a speed change the clip lasts duration / speed, and ad times,
+  // fades and the final length are all measured in that output time.
+  const contentDuration = duration / speed;
+  const finalDuration = outputDuration(contentDuration, adEvents);
+  const originalTemplate = template;
+  if (template.framing) template = { ...template, _fps: inputInfo?.fps, framing: { ...template.framing, _source: inputInfo?.width ? { width: inputInfo.width, height: inputInfo.height } : null } };
   return new Promise((resolve, reject) => {
     const textFiles = [];
     template = { ...template, textOverlays: (template.textOverlays || []).filter(text=>!template.sourceTimed||text.showTo>startTime&&text.showFrom<startTime+duration).map((text, i) => {
@@ -249,7 +369,8 @@ async function renderClip(inputPath, outputPath, startTime, duration, template, 
     const cleanup = () => textFiles.forEach(file => { try { fs.unlinkSync(file); } catch {} });
     const args = ['-y'];
 
-    // Input
+    // Input (decoded on the GPU when the encoder is a GPU one; filters still run on the CPU)
+    args.push(...encoder.inputArgs(kind));
     args.push('-ss', String(startTime));
     args.push('-t', String(duration));
     args.push('-i', inputPath);
@@ -273,7 +394,7 @@ async function renderClip(inputPath, outputPath, startTime, duration, template, 
     // Replace FADE_OUT_START placeholder
     let finalFilter = filterComplex;
     if (template.transitions && template.transitions.fadeOut) {
-      const fadeOutStart = duration - template.transitions.fadeOut;
+      const fadeOutStart = contentDuration - template.transitions.fadeOut;
       finalFilter = finalFilter.replace('FADE_OUT_START', String(Math.max(0, fadeOutStart)));
     }
 
@@ -292,7 +413,16 @@ async function renderClip(inputPath, outputPath, startTime, duration, template, 
     if (template.audio) {
       if (template.audio.volume !== undefined) audioFilters.push(`volume=${template.audio.volume}`);
       if (template.audio.fadeIn) audioFilters.push(`afade=t=in:st=0:d=${template.audio.fadeIn}`);
-      if (template.audio.fadeOut) audioFilters.push(`afade=t=out:st=${Math.max(0, duration - template.audio.fadeOut)}:d=${template.audio.fadeOut}`);
+      if (template.audio.fadeOut) audioFilters.push(`afade=t=out:st=${Math.max(0, contentDuration - template.audio.fadeOut)}:d=${template.audio.fadeOut}`);
+    }
+    // Speed change keeps the pitch: atempo handles 0.5–2× per step, so chain steps beyond that.
+    if (Math.abs(speed - 1) > .001 && inputInfo?.audioCodec) {
+      const tempo = [];
+      let rest = speed;
+      while (rest > 2) { tempo.push('atempo=2'); rest /= 2; }
+      while (rest < .5) { tempo.push('atempo=0.5'); rest /= .5; }
+      tempo.push(`atempo=${rest.toFixed(4)}`);
+      audioFilters.unshift(...tempo);
     }
     const frozen = freezeFilters(label, adEvents, audioFilters, !!inputInfo?.audioCodec);
     finalFilter += frozen.filter;
@@ -301,7 +431,19 @@ async function renderClip(inputPath, outputPath, startTime, duration, template, 
       const input = i + (hasWatermark ? 2 : 1);
       const w = Math.max(2, Math.round((template.output?.width || 1080) * event.width / 100 / 2) * 2);
       const h = Math.max(2, Math.round((template.output?.height || 1920) / 2) * 2);
-      let adFilter = `[${input}:v]setpts=PTS-STARTPTS,scale=w=${w}:h=${h}:force_original_aspect_ratio=decrease,format=rgba,colorchannelmixer=aa=${event.opacity},trim=duration=${event.duration}`;
+      const aspect = event.asset?.width && event.asset?.height ? event.asset.width / event.asset.height : null;
+      const decorated = aspect && (event.radius > 0 || event.shadow > 0);
+      let adFilter;
+      if (decorated) {
+        // Exact banner size (needed for the corner mask), then rounded corners / shadow, then animation.
+        const bw = Math.max(2, Math.round(Math.min(w, h * aspect) / 2) * 2), bh = Math.max(2, Math.round(Math.min(h, w / aspect) / 2) * 2);
+        finalFilter += `;[${input}:v]setpts=PTS-STARTPTS,scale=${bw}:${bh},format=rgba,colorchannelmixer=aa=${event.opacity},trim=duration=${event.duration}[adbase${i}]`;
+        const deco = decorate(`adbase${i}`, bw, bh, { radius: event.radius, shadow: event.shadow }, `addeco${i}`, template.output?.width || 1080);
+        finalFilter += ';' + deco.filters.join(';');
+        adFilter = `[${deco.label}]null`;
+      } else {
+        adFilter = `[${input}:v]setpts=PTS-STARTPTS,scale=w=${w}:h=${h}:force_original_aspect_ratio=decrease,format=rgba,colorchannelmixer=aa=${event.opacity},trim=duration=${event.duration}`;
+      }
       const localProgress = event.fade > 0 ? `max(0,min(1,min(t/${event.fade},(${event.duration}-t)/${event.fade})))` : '1';
       const zoom = `0.88+0.12*(${localProgress})*(${localProgress})*(3-2*(${localProgress}))`;
       if (event.animation === 'zoom' && event.fade > 0) adFilter += `,scale=w='max(2,trunc(iw*(${zoom})/2)*2)':h='max(2,trunc(ih*(${zoom})/2)*2)':eval=frame`;
@@ -350,9 +492,9 @@ async function renderClip(inputPath, outputPath, startTime, duration, template, 
     }
 
     // Output settings
-    args.push('-c:v', 'libx264');
-    args.push('-preset', template.output?.preset || 'medium');
-    args.push('-crf', String(template.output?.crf || 23));
+    args.push(...encoder.videoArgs(kind, template));
+    // Filter graphs (blur, overlays, text) are the CPU-heavy part: let them use every core.
+    args.push('-filter_complex_threads', String(Math.max(2, require('os').cpus().length)));
     args.push('-c:a', 'aac');
     args.push('-b:a', template.output?.audioBitrate || '192k');
     args.push('-movflags', '+faststart');
@@ -360,7 +502,8 @@ async function renderClip(inputPath, outputPath, startTime, duration, template, 
     args.push('-progress', 'pipe:1');
     args.push(outputPath);
 
-    const proc = spawn('ffmpeg', args);
+    const proc = spawn('ffmpeg', args, { windowsHide: true });
+    options.control?.procs?.add(proc);
     let stderr = '';
 
     proc.stdout.on('data', (data) => {
@@ -378,7 +521,15 @@ async function renderClip(inputPath, outputPath, startTime, duration, template, 
 
     proc.on('close', (code) => {
       cleanup();
+      options.control?.procs?.delete(proc);
+      if (options.control?.cancelled) return reject(Object.assign(new Error('Рендер отменён'), { cancelled: true }));
       if (code !== 0) {
+        // A GPU encoder that fails mid-job (driver, session limit, odd source) is retried on the CPU.
+        if (kind !== 'cpu') {
+          console.warn(`Encoder ${kind} failed, retrying on CPU:`, stderr.slice(-300));
+          if (/nvenc|cuda|qsv|amf|hwaccel|OpenEncodeSession|No capable devices/i.test(stderr)) encoder.disable(kind);
+          return resolve(renderClip(inputPath, outputPath, startTime, duration, originalTemplate, onProgress, adEvents, { ...options, encoder: 'cpu' }));
+        }
         return reject(new Error(`FFmpeg render failed (code ${code}): ${stderr.slice(-500)}`));
       }
       if (onProgress) onProgress(100);
@@ -393,6 +544,7 @@ module.exports = {
   getVideoInfo,
   generateThumbnail,
   generateTimelineThumbnails,
+  audioPeaks,
   buildFilterComplex,
   renderClip,
 };

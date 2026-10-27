@@ -17,7 +17,14 @@
 <body class="booting">
   <div class="app">
     <!-- ===== Navbar ===== -->
-<nav class="navbar"><a href="#" class="navbar__brand" onclick="navigate('home')"><div class="navbar__logo">v.</div><div class="studio-wordmark"><span class="navbar__title">VidCreator</span><small>студия нарезки</small></div></a><div class="nav-label">Разделы</div><div class="navbar__nav"><button class="nav-btn" data-page="home" onclick="navigate('home')"><span class="nav-btn__icon"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="camera-reels-fill"><use href="/icons/bi.svg#bi-camera-reels-fill"></use></svg></span><span>Видеостудия</span></button><button class="nav-btn" data-page="templates" onclick="navigate('templates')"><span class="nav-btn__icon"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="grid-fill"><use href="/icons/bi.svg#bi-grid-fill"></use></svg></span><span>Мои шаблоны</span></button><button class="nav-btn" data-page="render" onclick="navigate('render')"><span class="nav-btn__icon"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="cloud-arrow-down-fill"><use href="/icons/bi.svg#bi-cloud-arrow-down-fill"></use></svg></span><span>Экспорт и файлы</span></button></div><div class="navbar__actions"><div class="sidebar-note"><strong>Твоя студия. Твои правила.</strong>Из одного видео — серия клипов с твоим оформлением и рекламой.</div><div class="status-pill" id="engine-status"><span class="status-pill__dot"></span><span>Проверка FFmpeg…</span></div><div class="sidebar-footer"><span>Локальная студия</span><span>v.02</span></div></div></nav>
+<nav class="navbar"><a href="#" class="navbar__brand" onclick="navigate('home')"><div class="navbar__logo">v.</div><div class="studio-wordmark"><span class="navbar__title">VidCreator</span><small>студия нарезки</small></div></a><div class="nav-label">Разделы</div><div class="navbar__nav"><button class="nav-btn" data-page="home" onclick="navigate('home')"><span class="nav-btn__icon"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="camera-reels-fill"><use href="/icons/bi.svg#bi-camera-reels-fill"></use></svg></span><span>Видеостудия</span></button><button class="nav-btn" data-page="templates" onclick="navigate('templates')"><span class="nav-btn__icon"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="grid-fill"><use href="/icons/bi.svg#bi-grid-fill"></use></svg></span><span>Мои шаблоны</span></button><button class="nav-btn" data-page="render" onclick="navigate('render')"><span class="nav-btn__icon"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="cloud-arrow-down-fill"><use href="/icons/bi.svg#bi-cloud-arrow-down-fill"></use></svg></span><span>Экспорт и файлы</span></button></div><div class="navbar__actions"><section class="account-card" id="account-card" aria-label="Аккаунт Google">
+  <div class="account-card__avatar" id="account-avatar" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="lock-fill"><use href="/icons/bi.svg#bi-lock-fill"></use></svg></div>
+  <div class="account-card__body">
+    <strong id="account-name">Аккаунт Google</strong>
+    <span id="account-detail">Не подключён</span>
+  </div>
+  <button type="button" class="account-card__action" id="account-action" onclick="accountAction()">Войти в аккаунт</button>
+</section><div class="status-pill" id="engine-status"><span class="status-pill__dot"></span><span>Проверка FFmpeg…</span></div><div class="sidebar-footer"><span>Локальная студия</span><span>v.02</span></div></div></nav>
 
     <!-- ===== Main Content ===== -->
     <main class="main-content"><div class="studio-topbar"><span>Рабочее пространство <span style="margin:0 10px;color:#515c60">/</span> <strong id="studio-breadcrumb">Видеостудия</strong></span><span class="local-tag"><i class="local-tag__dot" aria-hidden="true"></i>Работает на этом компьютере</span></div>
@@ -74,58 +81,66 @@
               <!-- Mode 2: YouTube Downloader -->
               <div id="import-yt-panel" style="display:none;">
                 <div class="yt-card">
-                  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom: var(--space-xs);">
-                    <div style="font-weight:700; font-size:1.05rem; display:flex; align-items:center; gap:8px;">
-                      <span class="yt-logo-badge"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="play-fill"><use href="/icons/bi.svg#bi-play-fill"></use></svg></span> Скачать видео с YouTube
-                    </div>
-                    <span style="font-size:0.75rem; color:var(--text-muted); background:var(--surface-glass); padding:2px 8px; border-radius:4px;">
-                      VidKraken API v2
-                    </span>
+                  <div class="yt-card__head">
+                    <div class="yt-card__title"><span class="yt-logo-badge"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="play-fill"><use href="/icons/bi.svg#bi-play-fill"></use></svg></span> Скачать видео с YouTube</div>
+                    <span class="yt-engine" id="yt-engine-status">Проверка загрузчика…</span>
                   </div>
-                  <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:var(--space-md);">
-                    Вставь ссылку на длинное видео или Shorts. Видео скачается в максимальном качестве и сразу добавится в проект.
-                  </p>
+                  <p class="yt-card__text">Вставь ссылку на видео или Shorts. Файл скачивается прямо на этот компьютер через yt-dlp, без ключей и сторонних сервисов, и сразу попадает в библиотеку.</p>
+
+                  <div class="yt-engine-setup" id="yt-engine-setup" hidden>
+                    <p>Для загрузки нужен <b>yt-dlp</b> — бесплатный открытый загрузчик. Он скачается один раз из официального релиза на GitHub (около 18 МБ) и будет проверен по контрольной сумме.</p>
+                    <button type="button" class="btn btn--secondary btn--sm" id="yt-engine-install" onclick="installYouTubeEngine()"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="cloud-arrow-down-fill"><use href="/icons/bi.svg#bi-cloud-arrow-down-fill"></use></svg> Установить yt-dlp</button>
+                  </div>
 
                   <div class="yt-input-row">
-                    <input type="text" class="form-input yt-url-input" id="yt-url-input"
-                      placeholder="https://www.youtube.com/watch?v=... или https://youtu.be/..."
+                    <input type="url" class="form-input yt-url-input" id="yt-url-input" aria-label="Ссылка на видео YouTube"
+                      placeholder="https://www.youtube.com/watch?v=… или https://youtu.be/…"
                       onkeydown="if(event.key==='Enter') startYouTubeDownload()">
-                    <select class="form-select yt-format-select" id="yt-format-select">
-                      <option value="1080" selected>1080p (Full HD)</option>
-                      <option value="720">720p (HD)</option>
-                      <option value="480">480p (SD)</option>
+                    <select class="form-select yt-format-select" id="yt-format-select" aria-label="Качество">
+                      <option value="2160">До 4K</option>
+                      <option value="1440">До 1440p</option>
+                      <option value="1080" selected>До 1080p</option>
+                      <option value="720">До 720p</option>
+                      <option value="480">До 480p</option>
                     </select>
                     <button class="btn btn--primary" id="yt-download-btn" onclick="startYouTubeDownload()" style="white-space:nowrap;">
                       <svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="cloud-arrow-down-fill"><use href="/icons/bi.svg#bi-cloud-arrow-down-fill"></use></svg> Скачать
                     </button>
                   </div>
 
-                  <!-- Optional API Key toggle -->
-                  <div style="margin-top: var(--space-sm);">
-                    <span class="yt-api-toggle" onclick="toggleApiKeyInput()">
-                      <svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="gear-fill"><use href="/icons/bi.svg#bi-gear-fill"></use></svg> Настройка API ключа <span id="yt-api-arrow"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="caret-down-fill"><use href="/icons/bi.svg#bi-caret-down-fill"></use></svg></span>
-                    </span>
-                    <div id="yt-api-settings" style="display:none; margin-top: var(--space-xs);">
-                      <input type="password" class="form-input" id="yt-api-key-input"
-                        placeholder="API Key" autocomplete="off"
-                        style="font-family: var(--font-mono); font-size: 0.8rem;">
-                      <p style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">
-                        Ключ VidKraken API для скачивания с YouTube без ограничений
-                      </p>
+                  <details class="yt-auth" id="yt-auth" ontoggle="if(this.open)loadYouTubeAuth()">
+                    <summary><span>Вход в YouTube</span><b id="yt-auth-summary">Без входа</b></summary>
+                    <p class="yt-auth__hint">Нужен, если YouTube просит подтвердить, что ты не бот (часто бывает с VPN), и для видео 18+. Данные входа остаются на этом компьютере и используются только для скачивания.</p>
+                    <div class="yt-login">
+                      <p class="yt-login__state" id="yt-login-state">Вход через аккаунт Google — в карточке слева внизу. Войди один раз, дальше вход обновляется сам.</p>
+                      <button type="button" class="studio-help-link" onclick="focusAccountCard()">Показать карточку аккаунта</button>
                     </div>
-                  </div>
+                    <p class="yt-auth__more">Другие способы</p>
+                    <div class="yt-auth__options" id="yt-auth-options" role="group" aria-label="Способ входа"></div>
+                    <div class="yt-auth__file" id="yt-auth-file" hidden>
+                      <ol>
+                        <li>Установи в Chrome или Edge расширение <b>Get cookies.txt LOCALLY</b>.</li>
+                        <li>Открой youtube.com, где ты вошёл в аккаунт.</li>
+                        <li>Нажми на расширение → <b>Export</b> и сохрани файл.</li>
+                        <li>Выбери этот файл здесь.</li>
+                      </ol>
+                      <label class="btn btn--secondary btn--sm"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="cloud-arrow-up-fill"><use href="/icons/bi.svg#bi-cloud-arrow-up-fill"></use></svg> Выбрать cookies.txt<input type="file" accept=".txt,text/plain" hidden onchange="uploadYouTubeCookies(this.files[0]);this.value=''"></label>
+                      <span class="yt-auth__file-state" id="yt-auth-file-state"></span>
+                    </div>
+                  </details>
 
-                  <!-- Progress Area -->
                   <div class="yt-progress-container" id="yt-progress-area" style="display:none;">
                     <div class="yt-progress-title">
-                      <span id="yt-progress-title-text">Загрузка...</span>
-                      <span id="yt-progress-percent" style="font-family:var(--font-mono); color:var(--accent-light);">0%</span>
+                      <span id="yt-progress-title-text">Загрузка…</span>
+                      <span id="yt-progress-percent">0%</span>
                     </div>
-                    <div class="yt-progress-status" id="yt-progress-status-text">Инициализация задачи...</div>
+                    <div class="yt-progress-status" id="yt-progress-status-text">Получение информации о видео…</div>
                     <div class="progress-bar">
                       <div class="progress-bar__fill" id="yt-progress-bar" style="width: 0%;"></div>
                     </div>
+                    <button type="button" class="studio-help-link yt-cancel" id="yt-cancel-btn" onclick="cancelYouTubeDownload()">Отменить загрузку</button>
                   </div>
+                  <div class="yt-card__foot"><span id="yt-engine-version"></span><button type="button" class="studio-help-link" id="yt-engine-update" onclick="installYouTubeEngine(true)" hidden>Обновить yt-dlp</button></div>
                 </div>
               </div>
             </div>
@@ -192,6 +207,98 @@
                 </div>
               </div>
             </div>
+
+            <!-- Framing: how the source sits inside the output frame (zoom, pan, background) -->
+            <section class="framing" id="framing-panel" aria-labelledby="framing-title">
+              <div class="framing__head">
+                <h3 id="framing-title">Кадрирование</h3>
+                <button type="button" class="studio-help-link" onclick="resetFraming()">Сбросить</button>
+              </div>
+              <div class="framing__presets" role="group" aria-label="Быстрое кадрирование">
+                <button type="button" class="framing__preset" data-zoom="0" onclick="setFraming({zoom:0})">Весь кадр</button>
+                <button type="button" class="framing__preset" data-zoom="0.5" onclick="setFraming({zoom:.5})">Средне</button>
+                <button type="button" class="framing__preset" data-zoom="1" onclick="setFraming({zoom:1})">Заполнить экран</button>
+              </div>
+              <label class="framing__row" for="framing-zoom"><span>Масштаб</span><b id="framing-zoom-label">—</b></label>
+              <input type="range" id="framing-zoom" min="0" max="1.5" step="0.01" value="1" oninput="setFraming({zoom:Number(this.value)},false)" onchange="saveFraming()">
+              <div class="framing__grid">
+                <div>
+                  <label class="framing__row" for="framing-x"><span>По горизонтали</span></label>
+                  <input type="range" id="framing-x" min="0" max="1" step="0.01" value="0.5" oninput="setFraming({x:Number(this.value)},false)" onchange="saveFraming()">
+                </div>
+                <div>
+                  <label class="framing__row" for="framing-y"><span>По вертикали</span></label>
+                  <input type="range" id="framing-y" min="0" max="1" step="0.01" value="0.5" oninput="setFraming({y:Number(this.value)},false)" onchange="saveFraming()">
+                </div>
+              </div>
+              <div class="framing__section framing__section--speed">
+                <label class="framing__row" for="framing-speed"><span>Скорость видео</span><b id="framing-speed-label">1×</b></label>
+                <div class="framing__presets framing__presets--speed" role="group" aria-label="Быстрый выбор скорости">
+                  <button type="button" class="framing__preset" data-speed="0.5" onclick="setFraming({speed:.5})">0,5×</button>
+                  <button type="button" class="framing__preset" data-speed="0.75" onclick="setFraming({speed:.75})">0,75×</button>
+                  <button type="button" class="framing__preset" data-speed="1" onclick="setFraming({speed:1})">1×</button>
+                  <button type="button" class="framing__preset" data-speed="1.25" onclick="setFraming({speed:1.25})">1,25×</button>
+                  <button type="button" class="framing__preset" data-speed="1.5" onclick="setFraming({speed:1.5})">1,5×</button>
+                  <button type="button" class="framing__preset" data-speed="2" onclick="setFraming({speed:2})">2×</button>
+                </div>
+                <input type="range" id="framing-speed" min="0.25" max="3" step="0.05" value="1" oninput="setFraming({speed:Number(this.value)},false)" onchange="saveFraming()">
+                <p class="framing__note" id="framing-speed-note">Звук ускоряется без изменения тона. Длина клипов и время рекламы пересчитываются.</p>
+              </div>
+              <div class="framing__section">
+                <div class="framing__row framing__row--title"><span>Углы и тень</span>
+                  <span class="framing__quick"><button type="button" class="framing__preset" onclick="setFraming({radius:35})">Скруглить</button><button type="button" class="framing__preset" onclick="setFraming({shadow:60})">Тень</button></span>
+                </div>
+                <div class="framing__grid">
+                  <div>
+                    <label class="framing__row" for="framing-radius"><span>Скругление</span><b id="framing-radius-label">0%</b></label>
+                    <input type="range" id="framing-radius" min="0" max="100" step="1" value="0" oninput="setFraming({radius:Number(this.value)},false)" onchange="saveFraming()">
+                  </div>
+                  <div>
+                    <label class="framing__row" for="framing-shadow"><span>Тень</span><b id="framing-shadow-label">Нет</b></label>
+                    <input type="range" id="framing-shadow" min="0" max="100" step="1" value="0" oninput="setFraming({shadow:Number(this.value)},false)" onchange="saveFraming()">
+                  </div>
+                </div>
+              </div>
+              <label class="framing__row" for="framing-bg"><span>Фон по краям</span></label>
+              <select class="form-select" id="framing-bg" onchange="setFraming({background:this.value})">
+                <option value="blur">Размытое видео</option>
+                <option value="black">Чёрный</option>
+              </select>
+              <div class="framing__grid" id="framing-blur-settings">
+                <div>
+                  <label class="framing__row" for="framing-blur"><span>Размытие</span><b id="framing-blur-label">50%</b></label>
+                  <input type="range" id="framing-blur" min="0" max="100" step="1" value="50" oninput="setFraming({blur:Number(this.value)},false)" onchange="saveFraming()">
+                </div>
+                <div>
+                  <label class="framing__row" for="framing-opacity"><span>Непрозрачность фона</span><b id="framing-opacity-label">80%</b></label>
+                  <input type="range" id="framing-opacity" min="0" max="1" step="0.01" value="0.8" oninput="setFraming({opacity:Number(this.value)},false)" onchange="saveFraming()">
+                </div>
+              </div>
+              <p class="framing__hint">Перетаскивай видео в предпросмотре, чтобы сдвинуть кадр, а колесом мыши меняй масштаб. Настройка запоминается для каждого видео и применяется ко всем клипам при экспорте.</p>
+            </section>
+
+            <!-- Reaction layout: which part of the source is the streamer's webcam and which is the video -->
+            <section class="reaction" id="reaction-panel" aria-labelledby="reaction-title" hidden>
+              <div class="framing__head">
+                <h3 id="reaction-title">Раскладка реакции</h3>
+                <button type="button" class="studio-help-link" onclick="resetReaction()">Сбросить</button>
+              </div>
+              <p class="reaction__hint">Обведи вебку стримера и область видео: вебка встанет сверху, видео — снизу. Рамки двигаются мышкой, размер меняется за углы.</p>
+              <div class="reaction__presets" role="group" aria-label="Где вебка на записи">
+                <span>Вебка на записи:</span>
+                <button type="button" class="framing__preset" onclick="placeReactionCamera('br')">Справа снизу</button>
+                <button type="button" class="framing__preset" onclick="placeReactionCamera('bl')">Слева снизу</button>
+                <button type="button" class="framing__preset" onclick="placeReactionCamera('tr')">Справа сверху</button>
+                <button type="button" class="framing__preset" onclick="placeReactionCamera('tl')">Слева сверху</button>
+              </div>
+              <div class="reaction__stage" id="reaction-stage">
+                <canvas id="reaction-canvas" width="640" height="360" aria-hidden="true"></canvas>
+                <div class="reaction__box reaction__box--content" data-box="content" tabindex="0" aria-label="Область видео"><span>Видео</span><i data-corner="nw"></i><i data-corner="ne"></i><i data-corner="sw"></i><i data-corner="se"></i></div>
+                <div class="reaction__box reaction__box--camera" data-box="camera" tabindex="0" aria-label="Область вебки"><span>Вебка</span><i data-corner="nw"></i><i data-corner="ne"></i><i data-corner="sw"></i><i data-corner="se"></i></div>
+              </div>
+              <label class="framing__row" for="reaction-split"><span>Высота вебки в кадре</span><b id="reaction-split-label">40%</b></label>
+              <input type="range" id="reaction-split" min="0.2" max="0.6" step="0.01" value="0.4" oninput="setReaction({split:Number(this.value)},false)" onchange="saveReaction()">
+            </section>
           </div>
 
           <!-- Step 3: Slice Settings -->
@@ -600,6 +707,6 @@
     </div>
   </div>
 
-  <script src="/js/icons.js"></script><script src="/js/ad-schedule.js"></script><script src="/js/app.js"></script><script src="/js/studio.js"></script><script src="/js/canvas-editor.js"></script><script src="/js/editor-model.js"></script><script src="/js/editor-app.js"></script><script src="/js/editor-tools.js"></script><script src="/js/editor-interactions.js"></script>
+  <script src="/js/icons.js"></script><script src="/js/ad-schedule.js"></script><script src="/js/app.js"></script><script src="/js/studio.js"></script><script src="/js/canvas-editor.js"></script><script src="/js/studio-reaction.js"></script><script src="/js/editor-model.js"></script><script src="/js/editor-app.js"></script><script src="/js/editor-tools.js"></script><script src="/js/editor-interactions.js"></script><script src="/js/editor-media.js"></script>
 </body>
 </html>

@@ -2,6 +2,7 @@ const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 const { renderClip, getVideoInfo } = require('./ffmpeg');
+const encoder = require('./encoder');
 const { createSegments } = require('./slicer');
 const { plan, outputDuration } = require('../../public/js/ad-schedule');
 const { getAsset } = require('../routes/banners');
@@ -13,8 +14,9 @@ function persist(job) {
   fs.renameSync(target + '.tmp', target);
 }
 
-// Active render jobs
+// Active render jobs; controls hold the running ffmpeg processes so a job can be cancelled
 const jobs = new Map();
+const controls = new Map();
 for (const entry of fs.readdirSync(JOBS_DIR, { withFileTypes: true })) {
   if (!entry.isDirectory()) continue;
   try {
@@ -72,7 +74,9 @@ async function startRenderJob(videoPath, template, sliceConfig, adConfig, option
 
   // Create segments based on slice mode
   const segments = createSegments(videoInfo.duration, sliceConfig);
-  const adPlans = plan(adConfig, segments, getAsset).map(events => events.map(event => {
+  // Ads are scheduled in output time: with a speed change a clip lasts duration / speed.
+  const speed = Math.max(.25, Math.min(4, Number(template.framing?.speed) || 1));
+  const adPlans = plan(adConfig, segments.map(segment => ({ ...segment, duration: segment.duration / speed })), getAsset).map(events => events.map(event => {
     const asset = getAsset(event.assetId);
     if (!asset || !fs.existsSync(asset.filePath)) throw new Error('Рекламный баннер не найден. Загрузи его заново.');
     return { ...event, asset };
@@ -125,69 +129,74 @@ async function startRenderJob(videoPath, template, sliceConfig, adConfig, option
  */
 async function processJob(jobId) {
   const job = jobs.get(jobId);
-  if (!job) return;
+  if (!job || job.status === 'cancelled') return;
+  const control = { procs: new Set(), cancelled: false };
+  controls.set(jobId, control);
 
   job.status = 'processing';
   job.startedAt = new Date().toISOString();
+  job.encoder = (await encoder.info()).label;
   persist(job);
-  sendSSE(jobId, 'started', { jobId, totalSegments: job.totalSegments });
+  sendSSE(jobId, 'started', { jobId, totalSegments: job.totalSegments, encoder: job.encoder });
 
-  for (let i = 0; i < job.segments.length; i++) {
-    const segment = job.segments[i];
-    job.currentSegment = i;
+  // Several clips render at once (each ffmpeg keeps its own GPU/CPU busy); progress is the
+  // average of all clips, and the remaining time is extrapolated from the elapsed time.
+  const progress = new Array(job.segments.length).fill(0);
+  let lastSent = 0, next = 0;
+  const report = (force = false) => {
+    const overall = progress.reduce((sum, p) => sum + p, 0) / job.segments.length;
+    job.overallProgress = Math.min(99, Math.round(overall * (job.join ? .98 : 1)));
+    const elapsed = (Date.now() - Date.parse(job.startedAt)) / 1000;
+    job.etaSeconds = overall >= 2 ? Math.round(elapsed * (100 - overall) / overall) : null;
+    job.doneSegments = job.results.length + job.errors.length;
+    if (!force && Date.now() - lastSent < 500) return;
+    lastSent = Date.now();
+    sendSSE(jobId, 'progress', { overallProgress: job.overallProgress, etaSeconds: job.etaSeconds, doneSegments: job.doneSegments, totalSegments: job.totalSegments, active: progress.filter((p, i) => p > 0 && p < 100 && !job.results.some(r => r.segmentIndex === i)).length });
+  };
 
-    const outputFileName = `clip_${String(i + 1).padStart(3, '0')}.mp4`;
-    const outputPath = path.join(job.outputDir, outputFileName);
-
-    sendSSE(jobId, 'segment_start', {
-      segmentIndex: i,
-      totalSegments: job.totalSegments,
-      start: segment.start,
-      end: segment.end,
-    });
-
-    try {
-      await renderClip(
-        job.videoPath,
-        outputPath,
-        segment.start,
-        segment.duration,
-        job.template,
-        (progress) => {
-          const segmentContribution = progress / job.totalSegments;
-          job.overallProgress = Math.round(((i / job.totalSegments) * 100 + segmentContribution)*(job.join?.98:1));
-          sendSSE(jobId, 'progress', {
-            segmentIndex: i,
-            segmentProgress: Math.round(progress),
-            overallProgress: job.overallProgress,
-          });
-        },
-        job.adPlans?.[i] || []
-      );
-
-      job.results.push({
-        segmentIndex: i,
-        outputPath,
-        fileName: outputFileName,
-        start: segment.start,
-        end: segment.end,
-        duration: segment.duration,
-        outputDuration: outputDuration(segment.duration, job.adPlans?.[i]),
-        adEvents: (job.adPlans?.[i] || []).map(({ asset, ...event }) => event),
-      });
-
-      sendSSE(jobId, 'segment_complete', {
-        segmentIndex: i,
-        fileName: outputFileName,
-      });
-    } catch (err) {
-      job.errors.push({ segmentIndex: i, error: err.message });
-      sendSSE(jobId, 'segment_error', {
-        segmentIndex: i,
-        error: err.message,
-      });
+  const worker = async () => {
+    while (!control.cancelled && next < job.segments.length) {
+      const i = next++, segment = job.segments[i];
+      job.currentSegment = i;
+      const outputFileName = `clip_${String(i + 1).padStart(3, '0')}.mp4`;
+      const outputPath = path.join(job.outputDir, outputFileName);
+      sendSSE(jobId, 'segment_start', { segmentIndex: i, totalSegments: job.totalSegments, start: segment.start, end: segment.end });
+      try {
+        await renderClip(job.videoPath, outputPath, segment.start, segment.duration, job.template,
+          value => { progress[i] = value; report(); },
+          job.adPlans?.[i] || [], { control });
+        progress[i] = 100;
+        job.results.push({
+          segmentIndex: i,
+          outputPath,
+          fileName: outputFileName,
+          start: segment.start,
+          end: segment.end,
+          duration: segment.duration,
+          outputDuration: outputDuration(segment.duration / (Number(job.template.framing?.speed) || 1), job.adPlans?.[i]),
+          adEvents: (job.adPlans?.[i] || []).map(({ asset, ...event }) => event),
+        });
+        sendSSE(jobId, 'segment_complete', { segmentIndex: i, fileName: outputFileName });
+      } catch (err) {
+        if (err.cancelled || control.cancelled) { fs.rmSync(outputPath, { force: true }); return; }
+        progress[i] = 100;
+        job.errors.push({ segmentIndex: i, error: err.message });
+        sendSSE(jobId, 'segment_error', { segmentIndex: i, error: err.message });
+      }
+      report(true);
+      persist(job);
     }
+  };
+  await Promise.all(Array.from({ length: Math.min(await encoder.parallelism(), job.segments.length) }, worker));
+  controls.delete(jobId);
+  job.results.sort((x, y) => x.segmentIndex - y.segmentIndex);
+  if (control.cancelled) {
+    job.status = 'cancelled';
+    job.etaSeconds = null;
+    job.completedAt = new Date().toISOString();
     persist(job);
+    sendSSE(jobId, 'status', { status: 'cancelled', overallProgress: job.overallProgress });
+    return;
   }
 
   if(job.join&&!job.errors.length){
@@ -205,6 +214,7 @@ async function processJob(jobId) {
   }
   job.status = job.errors.length ? (job.results.length ? 'partial' : 'error') : 'completed';
   job.overallProgress = 100;
+  job.etaSeconds = null;
   job.completedAt = new Date().toISOString();
   persist(job);
 
@@ -234,15 +244,34 @@ function getAllJobs() {
     totalSegments: j.totalSegments,
     currentSegment: j.currentSegment,
     overallProgress: j.overallProgress,
+    etaSeconds: j.etaSeconds ?? null,
+    doneSegments: j.doneSegments ?? j.results.length,
+    encoder: j.encoder || null,
     createdAt: j.createdAt,
+    startedAt: j.startedAt,
     completedAt: j.completedAt,
     resultsCount: j.results.length,
     errorsCount: j.errors.length,
   }));
 }
 
+/** Stop a queued or running job; finished clips stay, the half-rendered ones are removed. */
+function cancelJob(jobId) {
+  const job = jobs.get(jobId);
+  if (!job) return null;
+  if (job.status === 'queued') {
+    job.status = 'cancelled'; job.completedAt = new Date().toISOString(); persist(job);
+    sendSSE(jobId, 'status', { status: 'cancelled', overallProgress: job.overallProgress });
+  } else if (job.status === 'processing') {
+    const control = controls.get(jobId);
+    if (control) { control.cancelled = true; control.procs.forEach(proc => { try { proc.kill(); } catch {} }); }
+  }
+  return job;
+}
+
 module.exports = {
   startRenderJob,
+  cancelJob,
   getJob,
   getAllJobs,
   addSSEClient,

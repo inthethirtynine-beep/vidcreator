@@ -4,14 +4,12 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
-const { getVideoInfo, generateThumbnail, generateTimelineThumbnails } = require('../services/ffmpeg');
+const { getVideoInfo, generateThumbnail, generateTimelineThumbnails, audioPeaks } = require('../services/ffmpeg');
 const { createSegments } = require('../services/slicer');
-const { startYouTubeJob, getJobStatus, downloadFile, DEFAULT_API_KEY } = require('../services/youtube');
+const youtube = require('../services/youtube');
 
 const UPLOADS_DIR = path.join(__dirname, '../../uploads');
 
-// Active YouTube download jobs
-const ytJobs = new Map();
 
 function sanitizeFileName(title) {
   return (title || 'youtube_video').replace(/[<>:"/\\|?*]+/g, '_').trim();
@@ -113,154 +111,66 @@ router.post('/upload', upload.single('video'), async (req, res) => {
   }
 });
 
-// POST /api/videos/youtube/start — start a download from YouTube
-router.post('/youtube/start', async (req, res) => {
+// YouTube import runs locally through yt-dlp (see src/services/youtube.js).
+router.get('/youtube/engine', async (req, res) => res.json(await youtube.status()));
+router.post('/youtube/engine/install', async (req, res) => {
+  youtube.install(req.body?.force === true);
+  res.json(await youtube.status());
+});
+
+// Signing in to YouTube for the bot check / age gates: a local browser or an uploaded cookies.txt.
+const authRoute = fn => (req, res) => { try { res.json(fn(req)); } catch (err) { res.status(400).json({ error: err.message }); } };
+router.get('/youtube/auth', authRoute(() => youtube.authStatus()));
+router.put('/youtube/auth', authRoute(req => youtube.setAuth(req.body)));
+router.post('/youtube/auth/cookies', authRoute(req => youtube.saveCookies(req.body?.content)));
+router.delete('/youtube/auth/cookies', authRoute(() => youtube.clearCookies()));
+// Sign-in window: open it, watch it, renew the saved session, or forget it.
+const loginRoute = fn => async (req, res) => { try { res.json(await fn(req)); } catch (err) { res.status(400).json({ error: err.message }); } };
+router.post('/youtube/login/start', loginRoute(req => youtube.startLogin(req.body?.browser)));
+router.post('/youtube/login/cancel', loginRoute(() => youtube.cancelLogin()));
+router.post('/youtube/login/refresh', loginRoute(() => youtube.refreshLogin()));
+router.delete('/youtube/login', loginRoute(() => youtube.forgetLogin()));
+
+// POST /api/videos/youtube/start — download a video by link into the library
+router.post('/youtube/start', (req, res) => {
   try {
-    const { url, format, apiKey } = req.body;
-    if (!url || !url.trim()) {
-      return res.status(400).json({ error: 'Укажи ссылку на YouTube видео' });
-    }
-
-    const jobData = await startYouTubeJob(url.trim(), format || '1080', apiKey);
-    const videoId = uuidv4();
-
-    ytJobs.set(jobData.jobId, {
-      ytJobId: jobData.jobId,
-      videoId,
-      url: url.trim(),
-      apiKey: apiKey || DEFAULT_API_KEY,
-      title: jobData.title || 'YouTube Video',
-      duration: jobData.duration || 0,
-      status: jobData.status || 'IN_QUEUE',
-      progress: null,
-      serverDownloadProgress: 0,
-      downloadPromise: null,
-      video: null,
-      error: null,
-      createdAt: new Date().toISOString(),
+    const videoId = uuidv4(), videoDir = path.join(UPLOADS_DIR, videoId);
+    const job = youtube.start(req.body?.url, req.body?.format, videoDir, async (filePath, title) => {
+      const info = await getVideoInfo(filePath);
+      if (!info.width || !info.height || !(info.duration > 0)) throw new Error('В скачанном файле нет видеодорожки');
+      const thumbPath = path.join(videoDir, 'thumbnail.jpg');
+      await generateThumbnail(filePath, thumbPath, Math.min(1, info.duration / 2));
+      const video = {
+        id: videoId,
+        originalName: sanitizeFileName(title) + path.extname(filePath),
+        path: filePath,
+        thumbnailPath: thumbPath,
+        thumbnailUrl: `/uploads/${videoId}/thumbnail.jpg`,
+        info,
+        uploadedAt: new Date().toISOString(),
+        sourceUrl: req.body.url,
+      };
+      videos.set(videoId, video);
+      return { id: video.id, originalName: video.originalName, thumbnailUrl: video.thumbnailUrl, info, uploadedAt: video.uploadedAt };
     });
-
-    res.status(200).json({
-      jobId: jobData.jobId,
-      videoId,
-      title: jobData.title,
-      duration: jobData.duration,
-      status: jobData.status,
-    });
+    res.status(201).json({ jobId: job.id, ...job });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(400).json({ error: err.message });
   }
 });
 
-// GET /api/videos/youtube/status/:jobId — poll YouTube download progress
-router.get('/youtube/status/:jobId', async (req, res) => {
-  const job = ytJobs.get(req.params.jobId);
-  if (!job) {
-    return res.status(404).json({ error: 'Задача YouTube не найдена' });
-  }
+// GET /api/videos/youtube/status/:jobId — poll download progress
+router.get('/youtube/status/:jobId', (req, res) => {
+  const job = youtube.get(req.params.jobId);
+  if (!job) return res.status(404).json({ error: 'Загрузка не найдена. Возможно, сервер перезапускался — начни заново.' });
+  res.json(job);
+});
 
-  // If already completed and registered
-  if (job.status === 'COMPLETED' && job.video) {
-    return res.json({
-      status: 'COMPLETED',
-      video: job.video,
-    });
-  }
-
-  if (job.status === 'FAILED') {
-    return res.json({
-      status: 'FAILED',
-      error: job.error || 'Ошибка загрузки с YouTube',
-    });
-  }
-
-  try {
-    const vkStatus = await getJobStatus(job.ytJobId, job.apiKey);
-    job.progress = vkStatus.progress;
-    if (vkStatus.title) job.title = vkStatus.title;
-
-    if (vkStatus.status === 'COMPLETED' && vkStatus.downloadUrl) {
-      if (!job.downloadPromise) {
-        job.status = 'DOWNLOADING_TO_SERVER';
-        const videoDir = path.join(UPLOADS_DIR, job.videoId);
-        fs.mkdirSync(videoDir, { recursive: true });
-        const filePath = path.join(videoDir, 'source.mp4');
-
-        job.downloadPromise = (async () => {
-          try {
-            await downloadFile(vkStatus.downloadUrl, filePath, (prog) => {
-              job.serverDownloadProgress = prog.percent;
-            });
-
-            const info = await getVideoInfo(filePath);
-            const thumbPath = path.join(videoDir, 'thumbnail.jpg');
-            await generateThumbnail(filePath, thumbPath, Math.min(1, (info.duration || 2) / 2));
-
-            const cleanTitle = sanitizeFileName(vkStatus.title || job.title) + '.mp4';
-            const video = {
-              id: job.videoId,
-              originalName: cleanTitle,
-              path: filePath,
-              thumbnailPath: thumbPath,
-              thumbnailUrl: `/uploads/${job.videoId}/thumbnail.jpg`,
-              info,
-              uploadedAt: new Date().toISOString(),
-              sourceUrl: job.url,
-            };
-
-            videos.set(job.videoId, video);
-            job.video = {
-              id: video.id,
-              originalName: video.originalName,
-              thumbnailUrl: video.thumbnailUrl,
-              info: video.info,
-              uploadedAt: video.uploadedAt,
-            };
-            job.status = 'COMPLETED';
-          } catch (err) {
-            job.status = 'FAILED';
-            job.error = err.message;
-          }
-        })();
-      }
-
-      if (job.status === 'DOWNLOADING_TO_SERVER') {
-        return res.json({
-          status: 'DOWNLOADING_TO_SERVER',
-          title: job.title,
-          percent: job.serverDownloadProgress || 0,
-        });
-      }
-
-      if (job.status === 'COMPLETED') {
-        return res.json({
-          status: 'COMPLETED',
-          video: job.video,
-        });
-      }
-
-      if (job.status === 'FAILED') {
-        return res.json({
-          status: 'FAILED',
-          error: job.error,
-        });
-      }
-    }
-
-    if (vkStatus.status === 'FAILED' || vkStatus.status === 'ERROR') {
-      job.status = 'FAILED';
-      job.error = vkStatus.error || vkStatus.message || 'Ошибка обработки на сервере VidKraken';
-      return res.json({ status: 'FAILED', error: job.error });
-    }
-
-    res.json({
-      status: vkStatus.status,
-      title: job.title,
-      progress: vkStatus.progress,
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+// POST /api/videos/youtube/cancel/:jobId — stop a running download and remove partial files
+router.post('/youtube/cancel/:jobId', (req, res) => {
+  const job = youtube.cancel(req.params.jobId);
+  if (!job) return res.status(404).json({ error: 'Загрузка не найдена' });
+  res.json(job);
 });
 
 // GET /api/videos — list all uploaded videos
@@ -329,6 +239,21 @@ router.get('/:id/thumbnails', async (req, res) => {
     }));
 
     res.json(urls);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/videos/:id/waveform — loudness envelope for the editor's audio track, cached next to the source
+router.get('/:id/waveform', async (req, res) => {
+  const video = videos.get(req.params.id);
+  if (!video) return res.status(404).json({ error: 'Video not found' });
+  const cacheFile = path.join(UPLOADS_DIR, video.id, 'waveform.json');
+  try {
+    if (fs.existsSync(cacheFile)) return res.json(JSON.parse(fs.readFileSync(cacheFile, 'utf8')));
+    const waveform = await audioPeaks(video.path);
+    fs.writeFileSync(cacheFile, JSON.stringify(waveform));
+    res.json(waveform);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -132,3 +132,95 @@ test('all entrance/exit animation variants render successfully', async t=>{
     assert.ok(pixel(out,1.7).every(c=>c<20),`${animation}: exit finishes`);
   }
 });
+
+test('studio framing fits a landscape source into a vertical frame over blur or black, and zoom fills it', async t=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'vidcreator-framing-'));
+  t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const source=path.join(dir,'source.mp4');
+  // Red landscape picture with a white middle stripe, so "fit" and "fill" are easy to tell apart.
+  ffmpeg(['-f','lavfi','-i','color=red:s=640x360:r=10:d=1','-vf','drawbox=x=0:y=150:w=640:h=60:color=white:t=fill','-c:v','libx264','-preset','ultrafast',source]);
+  const at=(file,x,y)=>[...ffmpeg(['-i',file,'-vf',`crop=2:2:${x}:${y}`,'-frames:v','1','-f','rawvideo','-pix_fmt','rgb24','pipe:1']).subarray(0,3)];
+  const render=async(name,framing)=>{const out=path.join(dir,name);await renderClip(source,out,0,1,{output:{width:180,height:320,preset:'ultrafast'},framing},null);return out;};
+  const black=await render('black.mp4',{zoom:0,background:'black'});
+  const info=await getVideoInfo(black);assert.equal(info.width,180);assert.equal(info.height,320);
+  assert.ok(at(black,90,20).every(c=>c<30),'whole frame visible: black bars above the picture');
+  assert.ok(at(black,90,170)[0]>200,'picture sits in the middle');
+  const blur=await render('blur.mp4',{zoom:0,background:'blur'});
+  assert.ok(at(blur,90,20)[0]>80,'bars are filled with the blurred source');
+  const dim=await render('dim.mp4',{zoom:0,background:'blur',blur:80,opacity:.3});
+  assert.ok(at(dim,90,20)[0]<at(blur,90,20)[0]-60,'lower opacity darkens the blurred background');
+  const sharp=await render('sharp.mp4',{zoom:0,background:'blur',blur:0,opacity:1});
+  assert.ok(at(sharp,90,20)[0]>200,'no blur and full opacity show the source colour as is');
+  const fill=await render('fill.mp4',{zoom:1});
+  assert.ok(at(fill,90,20)[0]>200&&at(fill,90,20)[1]<80,'zoom 1 fills the frame edge to edge');
+});
+
+test('speed retimes picture and sound; rounded corners and shadow decorate the framed video and banners', async t=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'vidcreator-speed-'));
+  t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const source=path.join(dir,'source.mp4'), banner=path.join(dir,'banner.png');
+  ffmpeg(['-f','lavfi','-i','color=red:s=640x360:r=30:d=4','-f','lavfi','-i','sine=frequency=440:duration=4','-c:v','libx264','-preset','ultrafast','-c:a','aac','-shortest',source]);
+  ffmpeg(['-f','lavfi','-i','color=lime:s=200x200','-frames:v','1',banner]);
+  const at=(file,x,y,time=.5)=>[...ffmpeg(['-ss',String(time),'-i',file,'-vf',`crop=2:2:${x}:${y}`,'-frames:v','1','-f','rawvideo','-pix_fmt','rgb24','pipe:1']).subarray(0,3)];
+  const fast=path.join(dir,'fast.mp4');
+  await renderClip(source,fast,0,4,{output:{width:180,height:320,preset:'ultrafast'},framing:{zoom:1,speed:2}},null);
+  const info=await getVideoInfo(fast);
+  assert.ok(Math.abs(info.duration-2)<.15,`2× speed halves the length: ${info.duration}`);
+  assert.equal(info.audioCodec,'aac');
+  assert.ok(audioRms(fast,.5,.5)>.05,'sound survives the tempo change');
+  // Whole frame visible over black: the picture band is 180×102 in the middle (y≈109..211).
+  const round=path.join(dir,'round.mp4');
+  await renderClip(source,round,0,1,{output:{width:180,height:320,preset:'ultrafast'},framing:{zoom:0,background:'black',radius:100,shadow:0}},null);
+  assert.ok(at(round,90,160)[0]>200,'centre of the picture stays');
+  assert.ok(at(round,0,110).every(c=>c<60),'the corner is rounded away to the background');
+  const shade=path.join(dir,'shade.mp4');
+  await renderClip(source,shade,0,1,{output:{width:180,height:320,preset:'ultrafast'},framing:{zoom:0,background:'blur',blur:0,opacity:1,radius:0,shadow:100}},null);
+  const plain=path.join(dir,'plain.mp4');
+  await renderClip(source,plain,0,1,{output:{width:180,height:320,preset:'ultrafast'},framing:{zoom:0,background:'blur',blur:0,opacity:1,radius:0,shadow:0}},null);
+  // The background is the same red picture, so the only thing that can darken it is the shadow.
+  assert.ok(at(shade,90,214)[0]<at(plain,90,214)[0]-10,`a shadow darkens the area just below the picture: ${at(shade,90,214)} vs ${at(plain,90,214)}`);
+  const events=plan({enabled:true,assetIds:['b'],count:1,firstStart:.2,duration:.6,endPadding:.1,fade:0,width:60,y:50,freezeOnAd:false,radius:100,shadow:60},[{duration:1}],()=>({animated:false}))[0].map(e=>({...e,asset:{filePath:banner,animated:false,width:200,height:200}}));
+  const ad=path.join(dir,'ad.mp4');
+  await renderClip(source,ad,0,1,{output:{width:180,height:320,preset:'ultrafast'}},null,events);
+  assert.ok(at(ad,90,160,.5)[1]>180,'banner centre is drawn');
+  assert.ok(at(ad,38,108,.5)[1]<150,'banner corner is rounded off');
+});
+
+test('a render job applies the chosen speed to every clip, not just the first', async t=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'vidcreator-speed-job-'));
+  const source=path.join(dir,'source.mp4');
+  // A colour per 2 s block, so each clip's first frame tells which part of the source it starts from.
+  ffmpeg(['-f','lavfi','-i','color=red:s=320x180:r=20:d=2','-f','lavfi','-i','color=lime:s=320x180:r=20:d=2','-f','lavfi','-i','color=blue:s=320x180:r=20:d=2','-filter_complex','[0][1][2]concat=n=3:v=1','-c:v','libx264','-preset','ultrafast',source]);
+  const { startRenderJob, getJob } = require('../src/services/renderer');
+  const job = await startRenderJob(source,{output:{width:180,height:320,preset:'ultrafast'},framing:{zoom:1,speed:2}},{mode:'count',clipCount:3},{enabled:false});
+  t.after(()=>{fs.rmSync(dir,{recursive:true,force:true});fs.rmSync(job.outputDir,{recursive:true,force:true});});
+  for (let i=0;i<200&&!['completed','partial','error'].includes(getJob(job.id).status);i++) await new Promise(r=>setTimeout(r,100));
+  const done=getJob(job.id);
+  assert.equal(done.status,'completed',JSON.stringify(done.errors));
+  assert.equal(done.results.length,3);
+  const colours=[];
+  for (const result of done.results) {
+    const info=await getVideoInfo(result.outputPath);
+    assert.ok(Math.abs(info.duration-1)<.15,`clip ${result.segmentIndex+1} lasts 1 s at 2× (got ${info.duration})`);
+    assert.ok(Math.abs(result.outputDuration-1)<.01,'reported length accounts for speed');
+    colours.push([...ffmpeg(['-ss','0.1','-i',result.outputPath,'-vf','crop=2:2:90:160','-frames:v','1','-f','rawvideo','-pix_fmt','rgb24','pipe:1']).subarray(0,3)]);
+  }
+  assert.ok(colours[0][0]>180&&colours[1][1]>180&&colours[2][2]>180,`clips start at red, green, blue: ${JSON.stringify(colours)}`);
+});
+
+test('reaction template puts the webcam region on top and the video below, also with a speed change', async t=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'vidcreator-reaction-'));
+  t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const source=path.join(dir,'stream.mp4'), out=path.join(dir,'out.mp4');
+  // A blue "stream" with a red "webcam" in the bottom-right corner.
+  ffmpeg(['-f','lavfi','-i','color=blue:s=640x360:r=20:d=2','-vf','drawbox=x=466:y=262:w=168:h=94:color=red:t=fill','-c:v','libx264','-preset','ultrafast',source]);
+  const template=JSON.parse(fs.readFileSync(path.join(__dirname,'../data/templates/tpl-stream-reaction-916.json'),'utf8'));
+  template.output={...template.output,width:180,height:320,preset:'ultrafast'};
+  template.framing={speed:2};
+  await renderClip(source,out,0,2,template,null);
+  const info=await getVideoInfo(out);
+  assert.ok(Math.abs(info.duration-1)<.15,`speed applies to the reaction layout: ${info.duration}`);
+  const at=(x,y)=>[...ffmpeg(['-ss','0.3','-i',out,'-vf',`crop=2:2:${x}:${y}`,'-frames:v','1','-f','rawvideo','-pix_fmt','rgb24','pipe:1']).subarray(0,3)];
+  assert.ok(at(90,60)[0]>180,`top shows the webcam: ${at(90,60)}`);
+  assert.ok(at(90,230)[2]>180,`bottom shows the stream: ${at(90,230)}`);
+});

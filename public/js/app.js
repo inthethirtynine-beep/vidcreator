@@ -234,6 +234,8 @@ function setImportMode(mode) {
     ytBtn.classList.add('active');
     filePanel.style.display = 'none';
     ytPanel.style.display = 'block';
+    refreshYouTubeEngine();
+    loadYouTubeAuth();
   } else {
     ytBtn.classList.remove('active');
     fileBtn.classList.add('active');
@@ -242,22 +244,176 @@ function setImportMode(mode) {
   }
 }
 
-function toggleApiKeyInput() {
-  const panel = document.getElementById('yt-api-settings');
-  const arrow = document.getElementById('yt-api-arrow');
-  if (panel.style.display === 'none') {
-    panel.style.display = 'block';
-    uiSetIcon(arrow, "caret-up-fill");
-  } else {
-    panel.style.display = 'none';
-    uiSetIcon(arrow, "caret-down-fill");
+// ---- YouTube import (local yt-dlp) ----
+let ytJobId = null, ytEnginePoll = null, ytRetryAfterAuth = false;
+
+// ---- Signing in to YouTube (bot check behind VPN, 18+ videos) ----
+let ytAuth = null;
+async function loadYouTubeAuth() {
+  try {
+    const response = await fetch('/api/videos/youtube/auth');
+    ytAuth = await response.json();
+    if (!response.ok) throw new Error(ytAuth.error);
+    renderYouTubeAuth();
+  } catch (err) { showToast('Вход в YouTube: ' + err.message, 'error'); }
+}
+function renderYouTubeAuth() {
+  const a = ytAuth; if (!a) return;
+  const browserName = a.browsers.find(b => b.id === a.browser)?.name || a.browser;
+  document.getElementById('yt-auth-summary').textContent = a.mode === 'file' ? (a.source === 'login' ? 'Вход выполнен' : 'Файл cookies.txt') : a.mode === 'browser' || a.mode === 'env' ? `Из браузера ${browserName}` : 'Без входа';
+  renderYouTubeLogin();
+  const options = [['none', null, 'Без входа'], ...a.browsers.map(b => ['browser', b.id, b.name]), ['file', null, 'Файл cookies.txt']];
+  document.getElementById('yt-auth-options').replaceChildren(...options.map(([mode, browser, label]) => {
+    const button = document.createElement('button');
+    button.type = 'button'; button.className = 'yt-auth__option'; button.textContent = label;
+    const active = mode === 'file' ? a.mode === 'file' : mode === 'browser' ? a.mode === 'browser' && a.browser === browser : a.mode === 'none';
+    button.setAttribute('aria-pressed', String(active));
+    button.disabled = a.mode === 'env';
+    button.onclick = () => mode === 'file' && !a.cookiesFile ? showCookiesFilePanel() : chooseYouTubeAuth(mode, browser);
+    return button;
+  }));
+  const panel = document.getElementById('yt-auth-file');
+  panel.hidden = a.mode !== 'file' && !panel.dataset.open;
+  document.getElementById('yt-auth-file-state').textContent = a.cookiesFile ? `Загружен ${new Date(a.cookiesFile.updatedAt).toLocaleString('ru')}` : '';
+}
+// ---- Google account (sidebar card): VidCreator opens its own sign-in window and keeps the session ----
+let ytLoginPoll = null;
+function renderYouTubeLogin() {
+  const login = ytAuth?.login; if (!login) return;
+  const card = document.getElementById('account-card'), avatar = document.getElementById('account-avatar');
+  const name = document.getElementById('account-name'), detail = document.getElementById('account-detail'), action = document.getElementById('account-action');
+  const waiting = login.state === 'waiting', account = login.profile ? login.account : null;
+  card.classList.toggle('signed-in', !!login.profile);
+  card.classList.toggle('waiting', waiting);
+  if (account?.photo) {
+    const img = document.createElement('img'); img.src = account.photo; img.alt = ''; img.referrerPolicy = 'no-referrer';
+    avatar.replaceChildren(img);
+  } else if (login.profile) {
+    avatar.textContent = (account?.name || account?.email || 'G').trim().charAt(0).toUpperCase();
+  } else avatar.innerHTML = uiIcon('lock-fill');
+  name.textContent = waiting ? 'Вход в аккаунт…' : login.profile ? (account?.name || 'Аккаунт Google') : 'Аккаунт Google';
+  detail.textContent = waiting ? (login.message || 'Войди в открывшемся окне') : login.state === 'error' ? login.message : login.profile ? (account?.email || 'Подключён') : 'Не подключён';
+  if (!login.browsers.length && !login.profile) detail.textContent = 'Нужен Edge или Chrome';
+  detail.title = detail.textContent;
+  detail.classList.toggle('error', login.state === 'error' && !waiting);
+  action.textContent = waiting ? 'Отменить' : login.profile ? 'Выйти' : 'Войти в аккаунт';
+  action.disabled = !login.browsers.length && !login.profile;
+  const pointer = document.getElementById('yt-login-state');
+  if (pointer) pointer.textContent = login.profile
+    ? `Вход выполнен: ${account?.email || 'аккаунт Google'}. Обновляется сам, выйти можно в карточке слева внизу.`
+    : 'Вход через аккаунт Google — в карточке слева внизу. Войди один раз, дальше вход обновляется сам.';
+  clearTimeout(ytLoginPoll); ytLoginPoll = null;
+  if (waiting) ytLoginPoll = setTimeout(async () => {
+    await loadYouTubeAuth();
+    if (ytAuth?.login.state === 'saved' && ytAuth.source === 'login') { showToast('Аккаунт Google подключён', 'success'); retryYouTubeAfterAuth(); }
+  }, 2000);
+}
+async function youtubeLoginAction(url, method = 'POST', body = {}) {
+  const response = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error);
+  ytAuth = data; renderYouTubeAuth();
+}
+// One button: sign in, cancel a sign-in in progress, or sign out.
+async function accountAction() {
+  const login = ytAuth?.login;
+  try {
+    if (login?.state === 'waiting') return await youtubeLoginAction('/api/videos/youtube/login/cancel');
+    if (login?.profile) return showConfirmModal('Выйти из аккаунта Google?', 'Сохранённый вход будет удалён с этого компьютера. Для видео, где YouTube просит подтверждение, нужно будет войти снова.', 'Выйти', async () => {
+      try { await youtubeLoginAction('/api/videos/youtube/login', 'DELETE'); showToast('Вы вышли из аккаунта', 'info'); } catch (err) { showToast(err.message, 'error'); }
+    });
+    await youtubeLoginAction('/api/videos/youtube/login/start', 'POST', {});
+  } catch (err) { showToast(err.message, 'error'); }
+}
+function focusAccountCard() {
+  const card = document.getElementById('account-card');
+  card.classList.remove('attention'); void card.offsetWidth; card.classList.add('attention');
+  setTimeout(() => card.classList.remove('attention'), 2400);
+}
+
+function showCookiesFilePanel() {
+  const panel = document.getElementById('yt-auth-file');
+  panel.dataset.open = '1'; panel.hidden = false;
+}
+async function chooseYouTubeAuth(mode, browser = null) {
+  try {
+    const response = await fetch('/api/videos/youtube/auth', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode, browser }) });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error);
+    ytAuth = data;
+    if (mode !== 'file') delete document.getElementById('yt-auth-file').dataset.open;
+    renderYouTubeAuth();
+    retryYouTubeAfterAuth();
+  } catch (err) { showToast(err.message, 'error'); }
+}
+async function uploadYouTubeCookies(file) {
+  if (!file) return;
+  try {
+    if (file.size > 2 * 1024 * 1024) throw new Error('Файл cookies слишком большой — экспортируй cookies только для youtube.com');
+    const response = await fetch('/api/videos/youtube/auth/cookies', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: await file.text() }) });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error);
+    ytAuth = data; renderYouTubeAuth();
+    showToast('Вход в YouTube сохранён', 'success');
+    retryYouTubeAfterAuth();
+  } catch (err) { showToast(err.message, 'error'); }
+}
+// After the user fixes sign-in, repeat the download that hit the bot check.
+function retryYouTubeAfterAuth() {
+  if (!ytRetryAfterAuth || ytJobId || !document.getElementById('yt-url-input').value.trim()) return;
+  ytRetryAfterAuth = false;
+  startYouTubeDownload();
+}
+
+async function refreshYouTubeEngine() {
+  const label = document.getElementById('yt-engine-status');
+  try {
+    const engine = await (await fetch('/api/videos/youtube/engine')).json();
+    const installing = engine.installation?.status === 'processing';
+    const failed = engine.installation?.status === 'error';
+    document.getElementById('yt-engine-setup').hidden = engine.ready && !installing;
+    document.getElementById('yt-engine-update').hidden = !engine.ready || installing;
+    document.getElementById('yt-engine-version').textContent = engine.version ? `yt-dlp ${engine.version}` : '';
+    document.getElementById('yt-download-btn').disabled = !engine.ready || installing || !!ytJobId;
+    const installBtn = document.getElementById('yt-engine-install');
+    installBtn.disabled = installing;
+    label.classList.toggle('ready', engine.ready && !installing);
+    label.textContent = installing
+      ? `${engine.installation.phase || 'Установка'}${engine.installation.progress != null ? ` · ${engine.installation.progress}%` : ''}`
+      : engine.ready ? 'Загрузчик готов' : 'Нужна установка';
+    if (failed && ytEnginePoll) showToast('yt-dlp: ' + engine.installation.error, 'error');
+    clearTimeout(ytEnginePoll); ytEnginePoll = null;
+    if (installing) ytEnginePoll = setTimeout(refreshYouTubeEngine, 800);
+    else if (engine.installation?.status === 'completed' && installBtn.dataset.waiting) { showToast('yt-dlp установлен — можно скачивать', 'success'); delete installBtn.dataset.waiting; }
+    return engine;
+  } catch {
+    label.textContent = 'Сервер недоступен';
+    return null;
   }
+}
+
+async function installYouTubeEngine(force = false) {
+  try {
+    const response = await fetch('/api/videos/youtube/engine/install', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ force }) });
+    if (!response.ok) throw new Error((await response.json()).error);
+    document.getElementById('yt-engine-install').dataset.waiting = '1';
+    ytEnginePoll = setTimeout(refreshYouTubeEngine, 300);
+  } catch (err) { showToast('Не удалось начать установку: ' + err.message, 'error'); }
+}
+
+const formatSpeed = bytes => bytes ? `${(bytes / 1048576).toFixed(1).replace('.', ',')} МБ/с` : '';
+const formatEta = seconds => seconds == null ? '' : `осталось ${Math.floor(seconds / 60)}:${String(Math.round(seconds % 60)).padStart(2, '0')}`;
+
+function resetYouTubeForm() {
+  if (ytPollInterval) clearInterval(ytPollInterval);
+  ytPollInterval = null; ytJobId = null;
+  const button = document.getElementById('yt-download-btn');
+  button.disabled = false;
+  button.innerHTML = uiIcon("cloud-arrow-down-fill") + ' Скачать';
 }
 
 async function startYouTubeDownload() {
   const urlInput = document.getElementById('yt-url-input');
-  const formatSelect = document.getElementById('yt-format-select');
-  const apiKeyInput = document.getElementById('yt-api-key-input');
   const downloadBtn = document.getElementById('yt-download-btn');
   const progressArea = document.getElementById('yt-progress-area');
   const progressBar = document.getElementById('yt-progress-bar');
@@ -267,130 +423,89 @@ async function startYouTubeDownload() {
 
   const url = (urlInput.value || '').trim();
   if (!url) {
-    showToast('Вставь ссылку на YouTube видео', 'warning');
+    showToast('Вставь ссылку на видео YouTube', 'warning');
     urlInput.focus();
     return;
   }
-
-  let validYoutubeUrl = false;
-  try { const parsed = new URL(url); validYoutubeUrl = parsed.protocol === 'https:' && ['youtube.com','www.youtube.com','m.youtube.com','youtu.be'].includes(parsed.hostname); } catch {}
-  if (!validYoutubeUrl) {
-    showToast('Укажи корректную ссылку на YouTube (youtube.com или youtu.be)', 'warning');
-    return;
-  }
-
-  const format = formatSelect.value || '1080';
-  const apiKey = (apiKeyInput.value || '').trim();
+  if (ytJobId) return;
 
   downloadBtn.disabled = true;
-  downloadBtn.innerHTML = uiIcon("clock-fill") + ' Запуск…';
+  downloadBtn.innerHTML = uiIcon("clock-fill") + ' Скачивание…';
   progressArea.style.display = 'block';
-  progressBar.style.width = '5%';
-  progressTitle.textContent = 'Подключение к VidKraken...';
-  progressPercent.textContent = '5%';
-  progressStatus.textContent = 'Постановка задачи в очередь...';
+  progressBar.style.width = '2%';
+  progressTitle.textContent = 'Видео с YouTube';
+  progressPercent.textContent = '0%';
+  progressStatus.textContent = 'Получение информации о видео…';
 
   try {
     const startRes = await fetch('/api/videos/youtube/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url, format, apiKey }),
+      body: JSON.stringify({ url, format: document.getElementById('yt-format-select').value || '1080' }),
     });
-
     const startData = await startRes.json();
-    if (!startRes.ok) {
-      throw new Error(startData.error || 'Не удалось запустить загрузку');
-    }
-
-    const jobId = startData.jobId;
-    if (startData.title) {
-      progressTitle.textContent = startData.title;
-    }
-
-    if (ytPollInterval) clearInterval(ytPollInterval);
+    if (!startRes.ok) throw new Error(startData.error || 'Не удалось начать загрузку');
+    ytJobId = startData.jobId;
 
     ytPollInterval = setInterval(async () => {
       try {
-        const pollRes = await fetch(`/api/videos/youtube/status/${jobId}`);
-        const pollData = await pollRes.json();
+        const pollRes = await fetch(`/api/videos/youtube/status/${ytJobId}`);
+        const job = await pollRes.json();
+        if (!pollRes.ok) throw new Error(job.error || 'Ошибка проверки статуса');
 
-        if (!pollRes.ok) {
-          throw new Error(pollData.error || 'Ошибка проверки статуса');
-        }
+        if (job.title) progressTitle.textContent = job.title;
+        progressBar.style.width = `${Math.max(2, job.percent || 0)}%`;
+        progressPercent.textContent = `${job.percent || 0}%`;
+        progressStatus.textContent = [job.stage, formatSpeed(job.speed), job.status === 'downloading' ? formatEta(job.eta) : ''].filter(Boolean).join(' · ');
 
-        if (pollData.title) {
-          progressTitle.textContent = pollData.title;
-        }
-
-        if (pollData.status === 'COMPLETED' && pollData.video) {
-          clearInterval(ytPollInterval);
-          ytPollInterval = null;
-
-          progressBar.style.width = '100%';
-          progressPercent.textContent = '100%';
-          progressStatus.textContent = 'Видео сохранено и готово к нарезке!';
-
-          state.currentVideoId = pollData.video.id;
-          state.currentVideoInfo = pollData.video.info;
-
-          setTimeout(() => {
-            progressArea.style.display = 'none';
-            downloadBtn.disabled = false;
-            downloadBtn.innerHTML = uiIcon("cloud-arrow-down-fill") + ' Скачать';
-            document.getElementById('upload-area').style.display = 'none';
-            const switcher = document.querySelector('.import-switcher');
-            if (switcher) switcher.style.display = 'none';
-            showVideoInfo(pollData.video);
-            showToast('Видео с YouTube успешно загружено!', 'success');
-          }, 800);
-          return;
-        }
-
-        if (pollData.status === 'FAILED') {
-          clearInterval(ytPollInterval);
-          ytPollInterval = null;
-          downloadBtn.disabled = false;
-          downloadBtn.innerHTML = uiIcon("cloud-arrow-down-fill") + ' Скачать';
-          showToast('Ошибка загрузки: ' + (pollData.error || 'Сбой'), 'error');
-          progressStatus.textContent = 'Ошибка: ' + (pollData.error || 'Сбой');
-          return;
-        }
-
-        if (pollData.status === 'DOWNLOADING_TO_SERVER') {
-          const sPercent = pollData.percent || 0;
-          progressBar.style.width = `${Math.max(50, sPercent)}%`;
-          progressPercent.textContent = `${sPercent}%`;
-          progressStatus.textContent = `Загрузка видеофайла на локальный сервер... (${sPercent}%)`;
-          return;
-        }
-
-        if (pollData.progress) {
-          const p = pollData.progress;
-          const pct = Math.max(10, Math.min(95, p.percent || 10));
-          progressBar.style.width = `${pct}%`;
-          progressPercent.textContent = `${pct}%`;
-          const stageMap = {
-            extracting: 'Извлечение видеопотока с YouTube...',
-            uploading: 'Подготовка файла на сервере VidKraken...',
-            downloading: 'Скачивание потока...',
-          };
-          progressStatus.textContent = (stageMap[p.stage] || `Обработка (${p.stage || 'in progress'})...`) + (p.etaSeconds ? ` (осталось ~${p.etaSeconds} сек)` : '');
-        } else {
-          progressStatus.textContent = 'В очереди обработки VidKraken...';
+        if (job.status === 'completed' && job.video) {
+          resetYouTubeForm();
+          progressArea.style.display = 'none';
+          urlInput.value = '';
+          state.currentVideoId = job.video.id;
+          state.currentVideoInfo = job.video.info;
+          const library = document.getElementById('source-library');
+          if (library) { library.add(new Option(`${job.video.originalName} · ${formatTime(job.video.info.duration)}`, job.video.id), 1); library.style.display = 'block'; }
+          showVideoInfo(job.video);
+          showToast('Видео с YouTube скачано и добавлено в библиотеку', 'success');
+        } else if (job.status === 'failed') {
+          resetYouTubeForm();
+          progressStatus.textContent = job.error || 'Не удалось скачать видео';
+          if (job.needsAuth) {
+            // Open the sign-in block right where it is needed; choosing a method repeats the download.
+            ytRetryAfterAuth = true;
+            const auth = document.getElementById('yt-auth');
+            auth.open = true; auth.classList.add('attention');
+            // Not signed in yet: point at the account card in the sidebar.
+            loadYouTubeAuth().then(() => { if (!ytAuth?.login?.profile) { focusAccountCard(); showToast('YouTube просит войти. Нажми «Войти в аккаунт» слева внизу — загрузка повторится сама.', 'info'); } });
+            auth.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          } else {
+            showToast(job.error || 'Не удалось скачать видео', 'error');
+          }
+        } else if (job.status === 'cancelled') {
+          resetYouTubeForm();
+          progressArea.style.display = 'none';
         }
       } catch (err) {
-        console.error('YouTube poll error:', err);
+        resetYouTubeForm();
+        progressStatus.textContent = err.message;
+        showToast(err.message, 'error');
       }
-    }, 1500);
-
+    }, 1000);
   } catch (err) {
-    if (ytPollInterval) clearInterval(ytPollInterval);
-    ytPollInterval = null;
-    downloadBtn.disabled = false;
-    downloadBtn.innerHTML = uiIcon("cloud-arrow-down-fill") + ' Скачать';
+    resetYouTubeForm();
     progressArea.style.display = 'none';
-    showToast('Ошибка: ' + err.message, 'error');
+    showToast(err.message, 'error');
+    refreshYouTubeEngine();
   }
+}
+
+async function cancelYouTubeDownload() {
+  if (!ytJobId) { document.getElementById('yt-progress-area').style.display = 'none'; return; }
+  try { await fetch(`/api/videos/youtube/cancel/${ytJobId}`, { method: 'POST' }); } catch {}
+  resetYouTubeForm();
+  document.getElementById('yt-progress-area').style.display = 'none';
+  showToast('Загрузка отменена', 'info');
 }
 
 function showVideoInfo(video) {
@@ -1199,13 +1314,16 @@ function renderSegmentsGrid(segments) {
   const container = document.getElementById('segments-grid');
   container.innerHTML = '';
 
+  // The speed from "Оформление" applies to every clip: show each clip's length after it.
+  const speed = typeof framingSpeed === 'function' ? framingSpeed() : 1, sped = Math.abs(speed - 1) > .001;
+  const speedLabel = `${String(Math.round(speed * 100) / 100).replace('.', ',')}×`;
   segments.forEach(seg => {
     const card = document.createElement('div');
     card.className = 'segment-card';
     card.innerHTML = `
-      <div class="segment-card__number">Клип #${seg.index + 1}</div>
+      <div class="segment-card__number">Клип #${seg.index + 1}${sped ? ` <span class="segment-card__speed">${speedLabel}</span>` : ''}</div>
       <div class="segment-card__time">${formatTime(seg.start)} → ${formatTime(seg.end)}</div>
-      <div class="segment-card__duration">Длительность: ${formatTime(seg.duration)}</div>
+      <div class="segment-card__duration">${sped ? `Длительность: ${formatTime(seg.duration / speed)} <s>${formatTime(seg.duration)}</s>` : `Длительность: ${formatTime(seg.duration)}`}</div>
     `;
     container.appendChild(card);
   });
@@ -1242,6 +1360,8 @@ async function startRender() {
         templateId: state.selectedTemplateId,
         sliceConfig: getSliceConfig(),
         adConfig: typeof getAdConfig === 'function' ? getAdConfig() : undefined,
+        framing: typeof getFraming === 'function' ? getFraming() : undefined,
+        reaction: typeof getReactionForRender === 'function' ? getReactionForRender() : undefined,
       }),
     });
 
@@ -1271,7 +1391,7 @@ function watchJobProgress(jobId) {
   eventSource.addEventListener('status', (e) => {
     const data = JSON.parse(e.data);
     updateJobUI(jobId, data);
-    if (['completed', 'partial', 'error'].includes(data.status)) { close(); loadRenderJobs(); }
+    if (['completed', 'partial', 'error', 'cancelled'].includes(data.status)) { close(); loadRenderJobs(); }
   });
 
   eventSource.addEventListener('progress', (e) => {
@@ -1279,9 +1399,9 @@ function watchJobProgress(jobId) {
     updateJobProgress(jobId, data);
   });
 
-  eventSource.addEventListener('segment_start', (e) => {
+  eventSource.addEventListener('started', (e) => {
     const data = JSON.parse(e.data);
-    updateJobSegmentStatus(jobId, `Рендер сегмента ${data.segmentIndex + 1}/${data.totalSegments}`);
+    updateJobUI(jobId, { status: 'processing', overallProgress: 0, totalSegments: data.totalSegments, doneSegments: 0, encoder: data.encoder });
   });
 
   eventSource.addEventListener('segment_complete', (e) => {
@@ -1348,16 +1468,17 @@ function renderJobsList(jobs) {
             ${new Date(job.createdAt).toLocaleString('ru')}
           </span>
         </div>
-        <span class="status-badge status-badge--${job.status}">${getStatusText(job.status)}</span>
+        <div class="render-job__actions">
+          <span class="status-badge status-badge--${job.status}">${getStatusText(job.status)}</span>
+          ${['queued', 'processing'].includes(job.status) ? `<button class="btn btn--ghost btn--sm render-job__cancel" onclick="cancelRenderJob('${job.id}')">${uiIcon("x-circle-fill")} Отменить</button>` : ''}
+        </div>
       </div>
       <div class="progress-bar">
         <div class="progress-bar__fill" style="width: ${job.overallProgress}%"></div>
       </div>
       <div class="progress-info">
         <span class="progress-percent">${job.overallProgress}%</span>
-        <span class="progress-status" id="job-status-${job.id}">
-          Сегмент ${job.currentSegment + 1}/${job.totalSegments}
-        </span>
+        <span class="progress-status" id="job-status-${job.id}">${renderJobStatusText(job)}</span>
       </div>
       ${job.errorsCount ? `<div class="render-error">Ошибки в ${job.errorsCount} клипах. Открой детали задачи для проверки.</div>` : ''}
       ${['completed', 'partial', 'error'].includes(job.status) ? `
@@ -1368,6 +1489,7 @@ function renderJobsList(jobs) {
       ` : ''}
     `;
     container.appendChild(el);
+    jobState.set(job.id, job);
 
     // Watch progress if still processing
     if (job.status === 'processing' || job.status === 'queued') {
@@ -1376,7 +1498,37 @@ function renderJobsList(jobs) {
   });
 }
 
+// "Готово 4 из 19 · осталось ~3:20 · Видеокарта NVIDIA (NVENC)"
+function renderJobStatusText(job) {
+  const parts = [];
+  if (job.totalSegments) parts.push(`Готово ${job.doneSegments ?? 0} из ${job.totalSegments}`);
+  if (job.status === 'processing') parts.push(job.etaSeconds != null ? `осталось ~${formatDuration(job.etaSeconds)}` : 'оцениваю время…');
+  if (job.status === 'queued') parts.push('ждёт очереди');
+  if (job.status === 'cancelled') parts.push('рендер отменён');
+  if (job.encoder && ['processing', 'queued'].includes(job.status)) parts.push(job.encoder);
+  return parts.join(' · ');
+}
+function formatDuration(seconds) {
+  seconds = Math.max(0, Math.round(seconds));
+  const h = Math.floor(seconds / 3600), m = Math.floor(seconds % 3600 / 60), s = seconds % 60;
+  return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`;
+}
+const jobState = new Map();
+function cancelRenderJob(jobId) {
+  showConfirmModal('Отменить рендер?', 'Уже готовые клипы останутся, недоделанные будут удалены.', 'Отменить рендер', async () => {
+    try {
+      const response = await fetch(`/api/render/jobs/${jobId}/cancel`, { method: 'POST' });
+      if (!response.ok) throw new Error((await response.json()).error);
+      showToast('Рендер отменяется…', 'info');
+      setTimeout(loadRenderJobs, 1200);
+    } catch (err) { showToast(err.message, 'error'); }
+  });
+}
+
 function updateJobUI(jobId, data) {
+  const merged = { ...(jobState.get(jobId) || {}), ...data };
+  jobState.set(jobId, merged);
+  updateJobSegmentStatus(jobId, renderJobStatusText(merged));
   const el = document.getElementById(`job-${jobId}`);
   if (!el) return;
 
@@ -1396,6 +1548,11 @@ function updateJobUI(jobId, data) {
 function updateJobProgress(jobId, data) {
   const el = document.getElementById(`job-${jobId}`);
   if (!el) return;
+  const merged = { ...(jobState.get(jobId) || {}), status: 'processing', ...data };
+  jobState.set(jobId, merged);
+  updateJobSegmentStatus(jobId, renderJobStatusText(merged));
+  const badge = el.querySelector('.status-badge');
+  if (badge && !badge.classList.contains('status-badge--processing')) { badge.className = 'status-badge status-badge--processing'; badge.textContent = getStatusText('processing'); }
 
   const fill = el.querySelector('.progress-bar__fill');
   if (fill) fill.style.width = data.overallProgress + '%';
@@ -1475,6 +1632,7 @@ function getStatusText(status) {
     completed: 'Готово',
     partial: 'Готово частично',
     error: 'Ошибка',
+    cancelled: 'Отменён',
   };
   return map[status] || status;
 }
@@ -1520,3 +1678,6 @@ document.querySelectorAll('input[type="range"]').forEach(input => {
 
 // Initial page load
 navigate('home');
+
+// The sidebar account card is visible on every page, so load the sign-in state on start.
+loadYouTubeAuth();

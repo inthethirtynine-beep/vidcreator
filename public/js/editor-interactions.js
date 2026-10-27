@@ -106,14 +106,37 @@ document.getElementById('ed-selection').addEventListener('keydown',event=>{
   if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(event.key)||!ed.bounds)return;event.preventDefault();const step=event.shiftKey?.02:.002,b=ed.bounds,s=ed.selected;
   ed.change(p=>{const dx=event.key==='ArrowLeft'?-step:event.key==='ArrowRight'?step:0,dy=event.key==='ArrowUp'?-step:event.key==='ArrowDown'?step:0;if(s.type==='layer'){const r=p.layers[s.index].rect;r.x+=dx;r.y+=dy;}else if(s.type==='text'){p.texts[s.index].x+=dx;p.texts[s.index].y+=dy;}else if(s.type==='subtitles'){p.subtitles.x+=dx;p.subtitles.y+=dy;}else{p.adConfig.x+=dx*100;p.adConfig.y+=dy*100;}});
 });
+// Shortcuts use event.code, so they work in the Russian layout too (Ctrl+Я is still undo).
 document.addEventListener('keydown',event=>{
   if(state.currentPage!=='editor')return;
   if(event.key==='Escape'){finishEditorGesture(true);if(document.getElementById('ed-modal')){ed.closeModal();ed.syncMedia(true);}else document.getElementById('ed-body').classList.remove('inspector-open','left-open');return;}
   if(event.target.matches('input,textarea,select,[contenteditable=true]'))return;
-  if(event.code==='Space'){event.preventDefault();ed.togglePlay();return;}
-  if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='z'){event.preventDefault();event.shiftKey?ed.redoChange():ed.undoChange();}
-  if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='s'){event.preventDefault();ed.flushSave().catch(ed.error);}
-  if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='b'){event.preventDefault();ed.split();}
-  if(event.key==='Delete'||event.key==='Backspace'){event.preventDefault();ed.focusArea==='timeline'?ed.removeCut():ed.deleteSelection();}
+  if(document.getElementById('ed-modal'))return;
+  const mod=event.ctrlKey||event.metaKey,code=event.code;
+  // Arrow keys on a focused canvas selection nudge the element (handled above), not the playhead.
+  if(event.target.closest?.('#ed-selection')&&code.startsWith('Arrow'))return;
+  const run=fn=>{event.preventDefault();fn();};
+  if(code==='Space'||code==='KeyK'&&!mod)return run(ed.togglePlay);
+  if(mod&&code==='KeyZ')return run(()=>event.shiftKey?ed.redoChange():ed.undoChange());
+  if(mod&&code==='KeyY')return run(ed.redoChange);
+  if(mod&&code==='KeyS')return run(()=>ed.flushSave().catch(ed.error));
+  if(mod&&code==='KeyB')return run(ed.split);
+  if(mod&&code==='KeyD')return run(ed.duplicateCut);
+  if(mod)return;
+  if(code==='ArrowLeft')return run(()=>event.shiftKey?(ed.pause(),ed.seek(ed.head-1)):ed.stepFrame(-1));
+  if(code==='ArrowRight')return run(()=>event.shiftKey?(ed.pause(),ed.seek(ed.head+1)):ed.stepFrame(1));
+  if(code==='ArrowUp')return run(()=>ed.jumpBoundary(-1));
+  if(code==='ArrowDown')return run(()=>ed.jumpBoundary(1));
+  if(code==='Home')return run(()=>{ed.pause();ed.seek(0);});
+  if(code==='End')return run(()=>{ed.pause();ed.seek(ed.duration);});
+  if(code==='KeyQ')return run(()=>ed.trimAtHead('start'));
+  if(code==='KeyW')return run(()=>ed.trimAtHead('end'));
+  if(code==='KeyL')return run(ed.toggleLoop);
+  if(code==='KeyM')return run(ed.toggleSound);
+  if(code==='Equal'||code==='NumpadAdd')return run(()=>ed.setZoom(ed.zoom*1.4));
+  if(code==='Minus'||code==='NumpadSubtract')return run(()=>ed.setZoom(ed.zoom/1.4));
+  if(code==='Backslash')return run(ed.fitTimeline);
+  if(event.key==='?'||event.key===','&&event.shiftKey||code==='Slash'&&event.shiftKey)return run(ed.showShortcuts);
+  if(code==='Delete'||code==='Backspace')return run(()=>ed.focusArea==='timeline'?ed.removeCut():ed.deleteSelection());
 });
 document.addEventListener('fullscreenchange',()=>{ed.fitStage();uiSetIcon('ed-fullscreen',document.fullscreenElement?"pip-fill":"aspect-ratio-fill");document.getElementById('ed-fullscreen').setAttribute('aria-label',document.fullscreenElement?'Выйти из полноэкранного просмотра':'Полноэкранный просмотр');});

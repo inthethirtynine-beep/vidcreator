@@ -151,14 +151,14 @@ function updateTimelineGesture(event) {
   g.moved ||= Math.abs(event.clientX-g.startX)>2;
   const c={...adConfig,...adConfig.clips[g.clip]},e=g.event;
   if(g.resize) {
-    const max=e.freeze?120:Math.min(120,(g.events[g.index+1]?.start??state.segments[g.clip].duration-c.endPadding)-e.start-(g.index<g.events.length-1?c.minGap:0));
+    const max=e.freeze?120:Math.min(120,(g.events[g.index+1]?.start??clipContentDuration(state.segments[g.clip])-c.endPadding)-e.start-(g.index<g.events.length-1?c.minGap:0));
     g.nextDuration=Math.round(Math.max(.2,Math.min(max,e.duration+delta))*100)/100;
     g.marker.style.width=`${g.nextDuration/g.resultDuration*100}%`;
     g.marker.title=`Длительность: ${g.nextDuration} сек`;
   } else {
     const previous=g.events[g.index-1],next=g.events[g.index+1];
     const min=previous?previous.start+(e.freeze?0:previous.duration)+c.minGap:0;
-    const max=Math.min(state.segments[g.clip].duration-c.endPadding-(e.freeze?0:e.duration),next?next.start-(e.freeze?0:e.duration)-c.minGap:Infinity);
+    const max=Math.min(clipContentDuration(state.segments[g.clip])-c.endPadding-(e.freeze?0:e.duration),next?next.start-(e.freeze?0:e.duration)-c.minGap:Infinity);
     g.nextStart=Math.round(Math.max(min,Math.min(max,e.start+delta))*100)/100;
     const inserted=g.events.slice(0,g.index).reduce((sum,item)=>sum+(item.freeze?item.duration:0),0);
     g.marker.style.left=`${(g.nextStart+inserted)/g.resultDuration*100}%`;
