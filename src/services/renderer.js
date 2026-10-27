@@ -8,7 +8,9 @@ const { getAsset } = require('../routes/banners');
 const JOBS_DIR = path.resolve(__dirname, '../../renders');
 let renderQueue = Promise.resolve();
 function persist(job) {
-  fs.writeFileSync(path.join(job.outputDir, 'job.json'), JSON.stringify(job, null, 2));
+  const target = path.join(job.outputDir, 'job.json');
+  fs.writeFileSync(target + '.tmp', JSON.stringify(job, null, 2));
+  fs.renameSync(target + '.tmp', target);
 }
 
 // Active render jobs
@@ -64,7 +66,7 @@ function removeSSEClient(jobId, res) {
 /**
  * Start a render job
  */
-async function startRenderJob(videoPath, template, sliceConfig, adConfig) {
+async function startRenderJob(videoPath, template, sliceConfig, adConfig, options = {}) {
   const jobId = uuidv4();
   const videoInfo = await getVideoInfo(videoPath);
 
@@ -87,6 +89,8 @@ async function startRenderJob(videoPath, template, sliceConfig, adConfig) {
     segments,
     videoInfo,
     adPlans,
+    join:!!options.join,
+    name:options.name||null,
     outputDir,
     status: 'queued',
     currentSegment: 0,
@@ -151,7 +155,7 @@ async function processJob(jobId) {
         job.template,
         (progress) => {
           const segmentContribution = progress / job.totalSegments;
-          job.overallProgress = Math.round((i / job.totalSegments) * 100 + segmentContribution);
+          job.overallProgress = Math.round(((i / job.totalSegments) * 100 + segmentContribution)*(job.join?.98:1));
           sendSSE(jobId, 'progress', {
             segmentIndex: i,
             segmentProgress: Math.round(progress),
@@ -186,6 +190,19 @@ async function processJob(jobId) {
     persist(job);
   }
 
+  if(job.join&&!job.errors.length){
+    try{
+      const list=path.join(job.outputDir,'.concat.txt');
+      fs.writeFileSync(list,job.results.map(r=>`file '${r.fileName}'`).join('\n'),'utf8');
+      const filename='montage.mp4';
+      await new Promise((resolve,reject)=>{
+        const proc=require('child_process').spawn('ffmpeg',['-hide_banner','-loglevel','error','-y','-f','concat','-safe','0','-i',list,'-c','copy','-movflags','+faststart',path.join(job.outputDir,filename)],{windowsHide:true});
+        let error='';proc.stderr.on('data',data=>{error+=data;});proc.on('error',reject);proc.on('close',code=>code===0?resolve():reject(new Error(error.slice(-1000))));
+      });
+      fs.unlinkSync(list);
+      job.results.unshift({segmentIndex:-1,kind:'sequence',fileName:filename,outputPath:path.join(job.outputDir,filename),start:0,end:job.segments.reduce((sum,c)=>sum+c.duration,0),duration:job.segments.reduce((sum,c)=>sum+c.duration,0),outputDuration:job.results.reduce((sum,c)=>sum+c.outputDuration,0)});
+    }catch(error){job.errors.push({error:`Объединение: ${error.message}`});}
+  }
   job.status = job.errors.length ? (job.results.length ? 'partial' : 'error') : 'completed';
   job.overallProgress = 100;
   job.completedAt = new Date().toISOString();
@@ -212,6 +229,7 @@ function getJob(jobId) {
 function getAllJobs() {
   return Array.from(jobs.values()).map(j => ({
     id: j.id,
+    name:j.name,
     status: j.status,
     totalSegments: j.totalSegments,
     currentSegment: j.currentSegment,

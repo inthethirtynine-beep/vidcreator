@@ -130,6 +130,10 @@ function buildFilterComplex(template, videoInfo) {
 
   const outputWidth = template.output?.width || 1080;
   const outputHeight = template.output?.height || 1920;
+  if(template.composition){
+    const composed=require('./compositor').compose(template.composition,outputWidth,outputHeight);
+    filters.push(...composed.filters);currentLabel=composed.label;
+  } else {
 
   // 1. Crop/Zoom — extract region from source and scale to output
   const crop = template.crop || {};
@@ -148,6 +152,7 @@ function buildFilterComplex(template, videoInfo) {
   filterIndex++;
 
   // 2. Color correction
+  }
   const color = template.colorCorrection || {};
   if (color.brightness !== undefined || color.contrast !== undefined || color.saturation !== undefined) {
     const brightness = color.brightness || 0;
@@ -194,6 +199,10 @@ function buildFilterComplex(template, videoInfo) {
   });
 
   // 4. Fade transitions
+  if(template.subtitleFile){
+    const escaped=template.subtitleFile.replace(/\\/g,'/').replace(/:/g,'\\:');
+    filters.push(`[${currentLabel}]ass=filename='${escaped}'[captioned]`);currentLabel='captioned';
+  }
   const transitions = template.transitions || {};
   if (transitions.fadeIn) {
     filters.push(`[${currentLabel}]fade=t=in:st=0:d=${transitions.fadeIn}[fadein${filterIndex}]`);
@@ -219,11 +228,16 @@ async function renderClip(inputPath, outputPath, startTime, duration, template, 
   const finalDuration = outputDuration(duration, adEvents);
   return new Promise((resolve, reject) => {
     const textFiles = [];
-    template = { ...template, textOverlays: (template.textOverlays || []).map((text, i) => {
+    template = { ...template, textOverlays: (template.textOverlays || []).filter(text=>!template.sourceTimed||text.showTo>startTime&&text.showFrom<startTime+duration).map((text, i) => {
       const textFile = path.join(path.dirname(outputPath), `.${path.basename(outputPath)}-text-${i}.txt`);
       fs.writeFileSync(textFile, text.content || '', 'utf8'); textFiles.push(textFile);
-      return { ...text, textFile };
+      return { ...text, textFile, ...(template.sourceTimed?{showFrom:Math.max(0,text.showFrom-startTime),showTo:Math.min(duration,text.showTo-startTime)}:{}) };
     }) };
+    if(template.subtitles?.enabled&&template.subtitles.cues?.length){
+      const subtitleFile=path.join(path.dirname(outputPath),`.${path.basename(outputPath)}.ass`);
+      fs.writeFileSync(subtitleFile,require('./subtitles').makeAss(template.subtitles,template.output.width,template.output.height,startTime,duration),'utf8');
+      textFiles.push(subtitleFile);template.subtitleFile=subtitleFile;
+    }
     const cleanup = () => textFiles.forEach(file => { try { fs.unlinkSync(file); } catch {} });
     const args = ['-y'];
 

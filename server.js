@@ -35,6 +35,7 @@ app.use('/api/templates', templatesRouter);
 app.use('/api/videos', videosRouter);
 app.use('/api/render', renderRouter);
 app.use('/api/banners', require('./src/routes/banners'));
+app.use('/api/editor', require('./src/routes/editor'));
 app.get('/api/health', async (req, res) => {
   const { execFile } = require('child_process');
   const check = name => new Promise(resolve => execFile(name, ['-version'], { windowsHide: true }, error => resolve(!error)));

@@ -1295,7 +1295,7 @@ function renderJobsList(jobs) {
     el.innerHTML = `
       <div class="render-job__header">
         <div>
-          <span class="render-job__id">${job.id.slice(0, 8)}...</span>
+          <span class="render-job__id">${escapeHtml(job.name || job.id.slice(0, 8)+'...')}</span>
           <span style="margin-left: var(--space-sm); font-size: 0.8rem; color: var(--text-muted);">
             ${new Date(job.createdAt).toLocaleString('ru')}
           </span>

@@ -343,6 +343,7 @@ router.delete('/:id', (req, res) => {
 
   const videoDir = path.join(UPLOADS_DIR, video.id);
   if (require('../services/renderer').isVideoBusy(video.path)) return res.status(409).json({ error: 'Видео используется в рендере. Дождись завершения задачи.' });
+  if (require('../services/transcription').isVideoBusy(video.id)) return res.status(409).json({error:'Видео используется для распознавания речи. Дождись завершения или отмени распознавание.'});
   fs.rmSync(videoDir, { recursive: true, force: true });
   videos.delete(video.id);
 

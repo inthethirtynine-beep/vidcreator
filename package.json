@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "setup:speech": "node scripts/setup-whisper.js base"
   },
   "keywords": ["video", "template", "ffmpeg", "clips"],
   "author": "",
