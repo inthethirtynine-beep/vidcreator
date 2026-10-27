@@ -10,11 +10,12 @@ const TEMPLATES_DIR = path.join(__dirname, '../../data/templates');
 // POST /api/render/start — start a render job
 router.post('/start', async (req, res) => {
   try {
-    const { videoId, templateId, sliceConfig } = req.body;
+    const { videoId, templateId, sliceConfig, adConfig } = req.body;
 
     if (!videoId || !templateId) {
       return res.status(400).json({ error: 'videoId and templateId are required' });
     }
+    if (![videoId, templateId].every(id => /^[a-zA-Z0-9-]+$/.test(id))) return res.status(400).json({ error: 'Некорректный идентификатор' });
 
     // Find the video file
     const videoDir = path.join(UPLOADS_DIR, videoId);
@@ -38,7 +39,7 @@ router.post('/start', async (req, res) => {
     const template = JSON.parse(fs.readFileSync(templatePath, 'utf-8'));
 
     // Start render job
-    const job = await startRenderJob(videoPath, template, sliceConfig || { mode: 'auto', segmentDuration: 120 });
+    const job = await startRenderJob(videoPath, template, sliceConfig || { mode: 'auto', segmentDuration: 120 }, adConfig);
 
     res.status(201).json({
       jobId: job.id,
@@ -47,7 +48,7 @@ router.post('/start', async (req, res) => {
       segments: job.segments,
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(400).json({ error: err.message });
   }
 });
 
@@ -74,6 +75,7 @@ router.get('/jobs/:id', (req, res) => {
       downloadUrl: `/renders/${job.id}/${r.fileName}`,
     })),
     errors: job.errors,
+    adPlans: job.adPlans?.map(events => events.map(({ asset, ...event }) => event)),
     createdAt: job.createdAt,
     startedAt: job.startedAt,
     completedAt: job.completedAt,
@@ -115,7 +117,7 @@ router.get('/jobs/:id/files', (req, res) => {
     return res.status(404).json({ error: 'Job not found' });
   }
 
-  if (job.status !== 'completed') {
+  if (!['completed', 'partial', 'error'].includes(job.status)) {
     return res.status(400).json({ error: 'Job not completed yet' });
   }
 
@@ -125,6 +127,7 @@ router.get('/jobs/:id/files', (req, res) => {
     start: r.start,
     end: r.end,
     duration: r.duration,
+    outputDuration: r.outputDuration || r.duration,
   }));
 
   res.json(files);

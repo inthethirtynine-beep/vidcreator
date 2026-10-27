@@ -52,7 +52,7 @@ function showToast(message, type = 'info') {
   toast.className = `toast toast--${type}`;
   toast.innerHTML = `
     <span class="toast__icon">${icons[type] || icons.info}</span>
-    <span class="toast__message">${message}</span>
+    <span class="toast__message">${escapeHtml(message)}</span>
   `;
 
   container.appendChild(toast);
@@ -252,7 +252,9 @@ async function startYouTubeDownload() {
     return;
   }
 
-  if (!url.includes('youtube.com') && !url.includes('youtu.be')) {
+  let validYoutubeUrl = false;
+  try { const parsed = new URL(url); validYoutubeUrl = parsed.protocol === 'https:' && ['youtube.com','www.youtube.com','m.youtube.com','youtu.be'].includes(parsed.hostname); } catch {}
+  if (!validYoutubeUrl) {
     showToast('Укажи корректную ссылку на YouTube (youtube.com или youtu.be)', 'warning');
     return;
   }
@@ -398,11 +400,14 @@ function removeVideo() {
     async () => {
       if (state.currentVideoId) {
         try {
-          await fetch(`/api/videos/${state.currentVideoId}`, { method: 'DELETE' });
-        } catch (e) { /* ignore */ }
+          const response = await fetch(`/api/videos/${state.currentVideoId}`, { method: 'DELETE' });
+          if (!response.ok) throw new Error((await response.json()).error);
+        } catch (e) { showToast(e.message,'error'); return; }
       }
 
       state.currentVideoId = null;
+      state.currentVideoInfo = null;
+      if (typeof resetStudioSource === 'function') resetStudioSource();
       state.currentVideoInfo = null;
 
       document.getElementById('video-info-area').style.display = 'none';
@@ -469,7 +474,7 @@ function renderTemplatesGrid(templates, containerId, showActions = false) {
           ${showActions ? `
             <button class="btn btn--ghost btn--sm" onclick="event.stopPropagation(); editTemplate('${t.id}')" title="Редактировать">✏️</button>
             <button class="btn btn--ghost btn--sm" onclick="event.stopPropagation(); duplicateTemplate('${t.id}')" title="Дублировать">📋</button>
-            <button class="btn btn--danger btn--sm" onclick="event.stopPropagation(); deleteTemplate('${t.id}', '${escapeHtml(t.name)}')" title="Удалить">🗑️</button>
+            <button class="btn btn--danger btn--sm" onclick="event.stopPropagation(); deleteTemplate('${t.id}')" title="Удалить">🗑️</button>
           ` : `
             <button class="btn btn--primary btn--sm" onclick="event.stopPropagation(); selectTemplate('${t.id}')">Выбрать</button>
           `}
@@ -657,8 +662,8 @@ function onTemplatePropChange() {
   state.editingTemplate.crop = {
     x: document.getElementById('editor-crop-x').value,
     y: document.getElementById('editor-crop-y').value,
-    width: 'ih*9/16',
-    height: 'ih',
+    width: `min(iw,ih*${dims.width}/${dims.height})`,
+    height: `min(ih,iw*${dims.height}/${dims.width})`,
   };
 
   // Color
@@ -834,6 +839,11 @@ async function saveCurrentTemplate() {
     });
 
     if (!response.ok) throw new Error('Failed to save');
+    if (state.selectedTemplateId === state.editingTemplate.id) {
+      state.selectedTemplate = structuredClone(state.editingTemplate);
+      document.getElementById('selected-template-name').textContent = state.editingTemplate.name;
+      if (typeof syncStudioPreview === 'function') syncStudioPreview();
+    }
     showToast('Шаблон сохранён!', 'success');
   } catch (err) {
     showToast('Ошибка сохранения: ' + err.message, 'error');
@@ -850,7 +860,7 @@ async function duplicateTemplate(id) {
   }
 }
 
-function deleteTemplate(id, name) {
+function deleteTemplate(id, name = 'этот шаблон') {
   showConfirmModal(
     'Удалить шаблон?',
     `Шаблон "${name}" будет удалён навсегда.`,
@@ -1183,13 +1193,14 @@ async function startRender() {
         videoId: state.currentVideoId,
         templateId: state.selectedTemplateId,
         sliceConfig: getSliceConfig(),
+        adConfig: typeof getAdConfig === 'function' ? getAdConfig() : undefined,
       }),
     });
 
     const job = await response.json();
     if (!response.ok) throw new Error(job.error);
 
-    showToast(`Рендер запущен! ${job.totalSegments} сегментов`, 'success');
+    showToast(`Рендер запущен · клипов: ${job.totalSegments}`, 'success');
 
     // Navigate to render page and watch progress
     navigate('render');
@@ -1198,16 +1209,21 @@ async function startRender() {
     showToast('Ошибка запуска: ' + err.message, 'error');
   } finally {
     btn.disabled = false;
-    btn.innerHTML = '🚀 Запустить рендер';
+    btn.innerHTML = 'Экспортировать клипы ↗';
   }
 }
 
+const jobStreams = new Map();
 function watchJobProgress(jobId) {
+  if (jobStreams.has(jobId)) return;
   const eventSource = new EventSource(`/api/render/jobs/${jobId}/progress`);
+  jobStreams.set(jobId, eventSource);
+  const close = () => { eventSource.close(); jobStreams.delete(jobId); };
 
   eventSource.addEventListener('status', (e) => {
     const data = JSON.parse(e.data);
     updateJobUI(jobId, data);
+    if (['completed', 'partial', 'error'].includes(data.status)) { close(); loadRenderJobs(); }
   });
 
   eventSource.addEventListener('progress', (e) => {
@@ -1232,14 +1248,14 @@ function watchJobProgress(jobId) {
 
   eventSource.addEventListener('completed', (e) => {
     const data = JSON.parse(e.data);
-    showToast(`Рендер завершён! ${data.results.length} клипов за ${Math.round(data.duration)}с`, 'success');
-    eventSource.close();
+    showToast(`Готово ${data.results.length} клипов за ${Math.round(data.duration)}с${data.errors.length ? ` · ошибок: ${data.errors.length}` : ''}`, data.errors.length ? 'warning' : 'success');
+    close();
     loadRenderJobs();
   });
 
   eventSource.addEventListener('error', () => {
     // SSE connection error — just reload jobs
-    eventSource.close();
+    close();
     setTimeout(() => loadRenderJobs(), 2000);
   });
 }
@@ -1254,9 +1270,11 @@ async function loadRenderJobs() {
   }
 }
 
+let emptyJobsElement = null;
 function renderJobsList(jobs) {
   const container = document.getElementById('render-jobs-list');
-  const emptyState = document.getElementById('no-jobs-state');
+  const emptyState = document.getElementById('no-jobs-state') || emptyJobsElement;
+  emptyJobsElement = emptyState;
 
   if (jobs.length === 0) {
     container.innerHTML = '';
@@ -1293,7 +1311,8 @@ function renderJobsList(jobs) {
           Сегмент ${job.currentSegment + 1}/${job.totalSegments}
         </span>
       </div>
-      ${job.status === 'completed' ? `
+      ${job.errorsCount ? `<div class="render-error">Ошибки в ${job.errorsCount} клипах. Открой детали задачи для проверки.</div>` : ''}
+      ${['completed', 'partial', 'error'].includes(job.status) ? `
         <div style="margin-top: var(--space-md);">
           <button class="btn btn--primary btn--sm" onclick="viewJobResults('${job.id}')">📂 Показать файлы</button>
         </div>
@@ -1354,6 +1373,7 @@ async function viewJobResults(jobId) {
   try {
     const response = await fetch(`/api/render/jobs/${jobId}/files`);
     const files = await response.json();
+    if (!response.ok) throw new Error(files.error);
 
     container.innerHTML = '';
     files.forEach(file => {
@@ -1365,7 +1385,7 @@ async function viewJobResults(jobId) {
         </div>
         <div class="result-card__info">
           <div class="result-card__name">${file.fileName}</div>
-          <div class="result-card__meta">${formatTime(file.start)} → ${formatTime(file.end)} (${formatTime(file.duration)})</div>
+          <div class="result-card__meta">Исходник ${formatTime(file.start)} → ${formatTime(file.end)}<br>Итог: ${formatTime(file.outputDuration || file.duration)}</div>
         </div>
         <div class="result-card__actions">
           <a href="${file.downloadUrl}" download class="btn btn--primary btn--sm">⬇ Скачать</a>
@@ -1373,6 +1393,12 @@ async function viewJobResults(jobId) {
         </div>
       `;
       container.appendChild(card);
+    });
+    const details = await (await fetch(`/api/render/jobs/${jobId}`)).json();
+    (details.errors || []).forEach(error => {
+      const el = document.createElement('p'); el.className = 'render-error';
+      el.textContent = typeof error === 'string' ? error : `Клип ${(error.segmentIndex ?? 0) + 1}: ${error.error}`;
+      container.appendChild(el);
     });
 
     container.style.display = 'grid';
@@ -1399,6 +1425,7 @@ function getStatusText(status) {
     queued: 'В очереди',
     processing: 'Рендерится',
     completed: 'Готово',
+    partial: 'Готово частично',
     error: 'Ошибка',
   };
   return map[status] || status;

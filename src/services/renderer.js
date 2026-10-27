@@ -2,10 +2,28 @@ const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 const { renderClip, getVideoInfo } = require('./ffmpeg');
-const { autoSlice, manualSlice } = require('./slicer');
+const { createSegments } = require('./slicer');
+const { plan, outputDuration } = require('../../public/js/ad-schedule');
+const { getAsset } = require('../routes/banners');
+const JOBS_DIR = path.resolve(__dirname, '../../renders');
+let renderQueue = Promise.resolve();
+function persist(job) {
+  fs.writeFileSync(path.join(job.outputDir, 'job.json'), JSON.stringify(job, null, 2));
+}
 
 // Active render jobs
 const jobs = new Map();
+for (const entry of fs.readdirSync(JOBS_DIR, { withFileTypes: true })) {
+  if (!entry.isDirectory()) continue;
+  try {
+    const job = JSON.parse(fs.readFileSync(path.join(JOBS_DIR, entry.name, 'job.json'), 'utf8'));
+    if (['queued', 'processing'].includes(job.status)) {
+      job.status = 'error';
+      job.errors.push({ error: 'Рендер прерван перезапуском сервера. Запусти задачу заново.' });
+    }
+    jobs.set(job.id, job);
+  } catch { /* Ignore directories from older versions without a manifest. */ }
+}
 
 // SSE clients
 const sseClients = new Map();
@@ -46,23 +64,17 @@ function removeSSEClient(jobId, res) {
 /**
  * Start a render job
  */
-async function startRenderJob(videoPath, template, sliceConfig) {
+async function startRenderJob(videoPath, template, sliceConfig, adConfig) {
   const jobId = uuidv4();
   const videoInfo = await getVideoInfo(videoPath);
 
   // Create segments based on slice mode
-  let segments;
-  if (sliceConfig.mode === 'auto') {
-    segments = autoSlice(
-      videoInfo.duration,
-      sliceConfig.segmentDuration || 120,
-      sliceConfig.overlap || 0
-    );
-  } else if (sliceConfig.mode === 'manual') {
-    segments = manualSlice(sliceConfig.timecodes || []);
-  } else {
-    segments = autoSlice(videoInfo.duration, sliceConfig.segmentDuration || 120);
-  }
+  const segments = createSegments(videoInfo.duration, sliceConfig);
+  const adPlans = plan(adConfig, segments, getAsset).map(events => events.map(event => {
+    const asset = getAsset(event.assetId);
+    if (!asset || !fs.existsSync(asset.filePath)) throw new Error('Рекламный баннер не найден. Загрузи его заново.');
+    return { ...event, asset };
+  }));
 
   // Create output directory for this job
   const outputDir = path.join(__dirname, '../../renders', jobId);
@@ -74,6 +86,7 @@ async function startRenderJob(videoPath, template, sliceConfig) {
     template,
     segments,
     videoInfo,
+    adPlans,
     outputDir,
     status: 'queued',
     currentSegment: 0,
@@ -87,13 +100,15 @@ async function startRenderJob(videoPath, template, sliceConfig) {
   };
 
   jobs.set(jobId, job);
+  persist(job);
 
   // Start processing asynchronously
-  processJob(jobId).catch(err => {
+  renderQueue = renderQueue.then(() => processJob(jobId)).catch(err => {
     const j = jobs.get(jobId);
     if (j) {
       j.status = 'error';
       j.errors.push(err.message);
+      persist(j);
       sendSSE(jobId, 'error', { message: err.message });
     }
   });
@@ -110,6 +125,7 @@ async function processJob(jobId) {
 
   job.status = 'processing';
   job.startedAt = new Date().toISOString();
+  persist(job);
   sendSSE(jobId, 'started', { jobId, totalSegments: job.totalSegments });
 
   for (let i = 0; i < job.segments.length; i++) {
@@ -141,7 +157,8 @@ async function processJob(jobId) {
             segmentProgress: Math.round(progress),
             overallProgress: job.overallProgress,
           });
-        }
+        },
+        job.adPlans?.[i] || []
       );
 
       job.results.push({
@@ -151,6 +168,8 @@ async function processJob(jobId) {
         start: segment.start,
         end: segment.end,
         duration: segment.duration,
+        outputDuration: outputDuration(segment.duration, job.adPlans?.[i]),
+        adEvents: (job.adPlans?.[i] || []).map(({ asset, ...event }) => event),
       });
 
       sendSSE(jobId, 'segment_complete', {
@@ -164,11 +183,13 @@ async function processJob(jobId) {
         error: err.message,
       });
     }
+    persist(job);
   }
 
-  job.status = 'completed';
+  job.status = job.errors.length ? (job.results.length ? 'partial' : 'error') : 'completed';
   job.overallProgress = 100;
   job.completedAt = new Date().toISOString();
+  persist(job);
 
   sendSSE(jobId, 'completed', {
     jobId,
@@ -208,4 +229,5 @@ module.exports = {
   getAllJobs,
   addSSEClient,
   removeSSEClient,
+  isVideoBusy: videoPath => Array.from(jobs.values()).some(job => job.videoPath === videoPath && ['queued','processing'].includes(job.status)),
 };

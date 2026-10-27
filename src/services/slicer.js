@@ -10,6 +10,10 @@
  * @returns {Array<{index: number, start: number, end: number, duration: number}>}
  */
 function autoSlice(totalDuration, segmentDuration, overlap = 0) {
+  if (![totalDuration, segmentDuration, overlap].every(Number.isFinite) || totalDuration <= 0 || segmentDuration <= 0 || overlap < 0 || overlap >= segmentDuration) {
+    throw new Error('Длительность должна быть положительной, перекрытие — меньше длины клипа');
+  }
+  if (Math.ceil(totalDuration / (segmentDuration - overlap)) > 1000) throw new Error('Максимум 1000 клипов за одну задачу');
   const segments = [];
   let start = 0;
   let index = 0;
@@ -18,9 +22,6 @@ function autoSlice(totalDuration, segmentDuration, overlap = 0) {
     const end = Math.min(start + segmentDuration, totalDuration);
     const duration = end - start;
 
-    // Skip very short segments (less than 3 seconds)
-    if (duration < 3 && index > 0) break;
-
     segments.push({
       index,
       start: Math.round(start * 1000) / 1000,
@@ -28,6 +29,7 @@ function autoSlice(totalDuration, segmentDuration, overlap = 0) {
       duration: Math.round(duration * 1000) / 1000,
     });
 
+    if (end >= totalDuration) break;
     start = end - overlap;
     index++;
   }
@@ -35,12 +37,34 @@ function autoSlice(totalDuration, segmentDuration, overlap = 0) {
   return segments;
 }
 
+function sliceByCount(totalDuration, count) {
+  if (!Number.isFinite(totalDuration) || totalDuration <= 0 || !Number.isInteger(count) || count < 1 || count > 1000 || totalDuration / count < 0.1) throw new Error('Укажи корректное количество клипов');
+  return Array.from({ length: count }, (_, index) => {
+    const start = totalDuration * index / count;
+    const end = totalDuration * (index + 1) / count;
+    return { index, start, end, duration: end - start };
+  });
+}
+
+function createSegments(totalDuration, config = {}) {
+  switch (config.mode || 'auto') {
+    case 'auto': return autoSlice(totalDuration, config.segmentDuration ?? 120, config.overlap ?? 0);
+    case 'count': return sliceByCount(totalDuration, config.clipCount);
+    case 'manual': return manualSlice(config.timecodes, totalDuration);
+    default: throw new Error('Неизвестный режим нарезки');
+  }
+}
+
 /**
  * Manual slice: create segments from timecode pairs
  * @param {Array<{start: number, end: number}>} timecodes - array of {start, end} in seconds
  * @returns {Array<{index: number, start: number, end: number, duration: number}>}
  */
-function manualSlice(timecodes) {
+function manualSlice(timecodes, totalDuration = Infinity) {
+  if (!Array.isArray(timecodes) || !timecodes.length || timecodes.length > 1000) throw new Error('Укажи от 1 до 1000 сегментов');
+  timecodes.forEach(tc => {
+    if (!Number.isFinite(tc.start) || !Number.isFinite(tc.end) || tc.start < 0 || tc.end <= tc.start || tc.end > totalDuration + 0.001) throw new Error('Проверь таймкоды: начало меньше конца, конец в пределах видео');
+  });
   return timecodes.map((tc, index) => ({
     index,
     start: tc.start,
@@ -73,6 +97,8 @@ function formatTimecode(seconds) {
 
 module.exports = {
   autoSlice,
+  sliceByCount,
+  createSegments,
   manualSlice,
   parseTimecode,
   formatTimecode,

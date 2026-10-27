@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { URL } = require('url');
 
-const DEFAULT_API_KEY = process.env.VIDKRAKEN_API_KEY || '507f2f9f-8cc1-491d-9a46-65dbff0af0b7';
+const DEFAULT_API_KEY = process.env.VIDKRAKEN_API_KEY || '';
 const API_BASE = 'https://vidkraken.com/api/v2';
 
 /**
@@ -13,6 +13,11 @@ const API_BASE = 'https://vidkraken.com/api/v2';
 function startYouTubeJob(youtubeUrl, format = '1080', apiKey = DEFAULT_API_KEY) {
   return new Promise((resolve, reject) => {
     const key = apiKey || DEFAULT_API_KEY;
+    if (!key) return reject(new Error('Укажи ключ VidKraken в настройках импорта или переменной VIDKRAKEN_API_KEY'));
+    try {
+      const url = new URL(youtubeUrl);
+      if (url.protocol !== 'https:' || !['youtube.com','www.youtube.com','m.youtube.com','youtu.be'].includes(url.hostname)) throw new Error();
+    } catch { return reject(new Error('Укажи корректную HTTPS-ссылку YouTube')); }
     const postData = JSON.stringify({
       url: youtubeUrl,
       format: String(format || '1080'),
@@ -43,6 +48,7 @@ function startYouTubeJob(youtubeUrl, format = '1080', apiKey = DEFAULT_API_KEY) 
     });
 
     req.on('error', reject);
+    req.setTimeout(30000, () => req.destroy(new Error('VidKraken не ответил за 30 секунд')));
     req.write(postData);
     req.end();
   });

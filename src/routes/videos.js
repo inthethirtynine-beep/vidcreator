@@ -5,7 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 const { getVideoInfo, generateThumbnail, generateTimelineThumbnails } = require('../services/ffmpeg');
-const { autoSlice } = require('../services/slicer');
+const { createSegments } = require('../services/slicer');
 const { startYouTubeJob, getJobStatus, downloadFile, DEFAULT_API_KEY } = require('../services/youtube');
 
 const UPLOADS_DIR = path.join(__dirname, '../../uploads');
@@ -50,6 +50,25 @@ const upload = multer({
 
 // In-memory video registry
 const videos = new Map();
+const setVideo = videos.set.bind(videos);
+videos.set = (id, video) => {
+  fs.writeFileSync(path.join(UPLOADS_DIR, id, 'video.json'), JSON.stringify(video, null, 2));
+  return setVideo(id, video);
+};
+const ready = Promise.all(fs.readdirSync(UPLOADS_DIR, { withFileTypes: true }).filter(e => e.isDirectory() && e.name !== 'banners').map(async entry => {
+  try {
+    const dir = path.join(UPLOADS_DIR, entry.name);
+    const manifest = path.join(dir, 'video.json');
+    if (fs.existsSync(manifest)) {
+      const video = JSON.parse(fs.readFileSync(manifest, 'utf8'));
+      if (fs.existsSync(video.path)) setVideo(video.id, video);
+    } else {
+      const source = fs.readdirSync(dir).find(f => /^source\.(mp4|mkv|avi|mov|webm|flv|wmv)$/i.test(f));
+      if (source) videos.set(entry.name, { id: entry.name, originalName: source, path: path.join(dir, source), thumbnailUrl: `/uploads/${entry.name}/thumbnail.jpg`, info: await getVideoInfo(path.join(dir, source)), uploadedAt: fs.statSync(dir).birthtime.toISOString() });
+    }
+  } catch (error) { console.warn('Video recovery:', error.message); }
+}));
+router.use(async (req, res, next) => { await ready; next(); });
 
 // POST /api/videos/upload — upload a video
 router.post('/upload', upload.single('video'), async (req, res) => {
@@ -63,6 +82,7 @@ router.post('/upload', upload.single('video'), async (req, res) => {
 
     // Get video info
     const info = await getVideoInfo(videoPath);
+    if (!info.width || !info.height || !Number.isFinite(info.duration) || info.duration <= 0) throw new Error('Не удалось прочитать видеодорожку или длительность файла');
 
     // Generate thumbnail
     const thumbDir = path.join(UPLOADS_DIR, videoId);
@@ -274,30 +294,20 @@ router.get('/:id', (req, res) => {
 
 // POST /api/videos/:id/slice-preview — preview how video will be sliced
 router.post('/:id/slice-preview', (req, res) => {
+  try {
   const video = videos.get(req.params.id);
   if (!video) {
     return res.status(404).json({ error: 'Video not found' });
   }
 
-  const { mode, segmentDuration, overlap, timecodes } = req.body;
-
-  let segments;
-  if (mode === 'manual' && timecodes) {
-    const { manualSlice } = require('../services/slicer');
-    segments = manualSlice(timecodes);
-  } else {
-    segments = autoSlice(
-      video.info.duration,
-      segmentDuration || 120,
-      overlap || 0
-    );
-  }
+  const segments = createSegments(video.info.duration, req.body);
 
   res.json({
     totalDuration: video.info.duration,
     segments,
     totalSegments: segments.length,
   });
+  } catch (error) { res.status(400).json({ error: error.message }); }
 });
 
 // GET /api/videos/:id/thumbnails — generate timeline thumbnails
@@ -308,7 +318,7 @@ router.get('/:id/thumbnails', async (req, res) => {
   }
 
   try {
-    const count = parseInt(req.query.count) || 20;
+    const count = Math.max(1, Math.min(50, parseInt(req.query.count) || 20));
     const thumbDir = path.join(UPLOADS_DIR, video.id, 'timeline');
     fs.mkdirSync(thumbDir, { recursive: true });
 
@@ -332,6 +342,7 @@ router.delete('/:id', (req, res) => {
   }
 
   const videoDir = path.join(UPLOADS_DIR, video.id);
+  if (require('../services/renderer').isVideoBusy(video.path)) return res.status(409).json({ error: 'Видео используется в рендере. Дождись завершения задачи.' });
   fs.rmSync(videoDir, { recursive: true, force: true });
   videos.delete(video.id);
 

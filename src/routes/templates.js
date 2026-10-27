@@ -5,6 +5,10 @@ const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 
 const TEMPLATES_DIR = path.join(__dirname, '../../data/templates');
+router.param('id', (req, res, next, id) => {
+  if (!/^[a-zA-Z0-9-]+$/.test(id)) return res.status(400).json({ error: 'Некорректный идентификатор шаблона' });
+  next();
+});
 
 // Default template structure
 function createDefaultTemplate() {
