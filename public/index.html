@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#101013">
   <meta name="description" content="VidCreator — локальный сервис для нарезки видео по кастомным шаблонам">
   <title>VidCreator — Видеоредактор шаблонов</title>
   <link rel="stylesheet" href="/css/styles.css">
@@ -10,11 +11,13 @@
   <link rel="stylesheet" href="/css/editor.css">
   <link rel="stylesheet" href="/css/icons.css">
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=Unbounded:wght@500;600;700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&display=swap">
   <link rel="stylesheet" href="/css/polish.css">
+  <link rel="stylesheet" href="/css/graphite.css">
   <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">
 </head>
 <body class="booting">
+  <a class="skip-link" href="#workspace">К рабочей области</a>
   <div class="app">
     <!-- ===== Navbar ===== -->
 <nav class="navbar"><a href="#" class="navbar__brand" onclick="navigate('home')"><div class="navbar__logo">v.</div><div class="studio-wordmark"><span class="navbar__title">VidCreator</span><small>студия нарезки</small></div></a><div class="nav-label">Разделы</div><div class="navbar__nav"><button class="nav-btn" data-page="home" onclick="navigate('home')"><span class="nav-btn__icon"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="camera-reels-fill"><use href="/icons/bi.svg#bi-camera-reels-fill"></use></svg></span><span>Видеостудия</span></button><button class="nav-btn" data-page="templates" onclick="navigate('templates')"><span class="nav-btn__icon"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="grid-fill"><use href="/icons/bi.svg#bi-grid-fill"></use></svg></span><span>Мои шаблоны</span></button><button class="nav-btn" data-page="render" onclick="navigate('render')"><span class="nav-btn__icon"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="cloud-arrow-down-fill"><use href="/icons/bi.svg#bi-cloud-arrow-down-fill"></use></svg></span><span>Экспорт и файлы</span></button></div><div class="navbar__actions"><section class="account-card" id="account-card" aria-label="Аккаунт Google">
@@ -27,11 +30,18 @@
 </section><div class="status-pill" id="engine-status"><span class="status-pill__dot"></span><span>Проверка FFmpeg…</span></div><div class="sidebar-footer"><span>Локальная студия</span><span>v.02</span></div></div></nav>
 
     <!-- ===== Main Content ===== -->
-    <main class="main-content"><div class="studio-topbar"><span>Рабочее пространство <span style="margin:0 10px;color:#515c60">/</span> <strong id="studio-breadcrumb">Видеостудия</strong></span><span class="local-tag"><i class="local-tag__dot" aria-hidden="true"></i>Работает на этом компьютере</span></div>
+    <main class="main-content" id="workspace" tabindex="-1"><div class="studio-topbar"><span>Рабочее пространство <span style="margin:0 10px;color:#515c60">/</span> <strong id="studio-breadcrumb">Видеостудия</strong></span><span class="local-tag"><i class="local-tag__dot" aria-hidden="true"></i>Работает на этом компьютере</span></div>
 
       <!-- ========== HOME PAGE ========== -->
       <div id="page-home" class="page-view active">
-        <div class="studio-heading"><div><h1>Из длинного видео — серия клипов с рекламой</h1><p>Загрузи исходник, выбери оформление и нарезку. На время рекламного баннера кадр замирает, а звук ставится на паузу.</p></div><button type="button" class="project-tag" id="studio-source-chip" onclick="navigate('editor')" title="Открыть исходник в редакторе"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="grid-1x2-fill"><use href="/icons/bi.svg#bi-grid-1x2-fill"></use></svg><span id="studio-source-chip-text">Открыть редактор</span></button></div>
+        <section class="studio-heading">
+          <div class="studio-heading__copy">
+            <h1>Видеостудия</h1>
+            <p>Нарезай длинные видео на клипы, добавляй субтитры и настраивай рекламные вставки.</p>
+            <button type="button" class="project-tag" id="studio-source-chip" onclick="navigate('editor')" title="Открыть исходник в редакторе"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-bi="grid-1x2-fill"><use href="/icons/bi.svg#bi-grid-1x2-fill"></use></svg><span id="studio-source-chip-text">Открыть редактор</span></button>
+          </div>
+          <div class="studio-heading__art" aria-hidden="true"><img src="/art/studio-sampler.webp" width="1200" height="800" alt="" fetchpriority="high"></div>
+        </section>
         <nav class="studio-steps" aria-label="Этапы создания"><i class="studio-steps__progress" id="studio-steps-progress" aria-hidden="true"></i><button class="studio-step active" data-step="1" onclick="studioStep(1)"><span>1</span><em><b>Исходник</b><small id="studio-step-note-1">—</small></em></button><button class="studio-step" data-step="2" onclick="studioStep(2)"><span>2</span><em><b>Оформление</b><small id="studio-step-note-2">—</small></em></button><button class="studio-step" data-step="3" onclick="studioStep(3)"><span>3</span><em><b>Нарезка</b><small id="studio-step-note-3">—</small></em></button><button class="studio-step" data-step="4" onclick="studioStep(4)"><span>4</span><em><b>Реклама и экспорт</b><small id="studio-step-note-4">—</small></em></button></nav>
         <div class="studio-layout"><section class="studio-panel"><div class="panel-heading"><h2 id="studio-panel-title">Добавь исходное видео</h2><small id="studio-step-count">Шаг 1 из 4</small></div><div class="workflow">
 
@@ -195,8 +205,8 @@
               </div>
             </div>
 
-            <div id="selected-template-info" style="display:none;" class="card" style="margin-top: var(--space-md);">
-              <div style="display:flex; align-items:center; justify-content:space-between;">
+            <div id="selected-template-info" style="display:none;" class="card">
+              <div class="selected-template-summary">
                 <div>
                   <div style="font-weight: 700; font-size: 1rem;">Выбран: <span id="selected-template-name" style="color: var(--accent-light);">—</span></div>
                   <div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px;" id="selected-template-desc">—</div>
@@ -692,7 +702,7 @@
     </main>
 
     <!-- Toast container -->
-    <div class="toast-container" id="toast-container"></div>
+    <div class="toast-container" id="toast-container" role="status" aria-live="polite"></div>
 
     <!-- Delete Confirmation Modal -->
     <div class="modal-overlay hidden" id="confirm-modal" onclick="if(event.target===this)closeConfirmModal()">

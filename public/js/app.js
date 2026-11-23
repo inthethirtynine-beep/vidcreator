@@ -25,14 +25,16 @@ function navigate(page) {
 
   // Hide all pages
   document.querySelectorAll('.page-view').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(button => {
+    const current = button.dataset.page === page;
+    button.classList.toggle('active', current);
+    if (current) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
+  });
 
   // Show target page
   const pageEl = document.getElementById(`page-${page}`);
   if (pageEl) pageEl.classList.add('active');
-
-  const navBtn = document.querySelector(`.nav-btn[data-page="${page}"]`);
-  if (navBtn) navBtn.classList.add('active');
 
   // Load page data
   if (page === 'templates') loadTemplatesList();

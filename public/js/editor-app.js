@@ -177,8 +177,38 @@ ed.toggleInspector=()=>document.getElementById('ed-body').classList.toggle('insp
 ed.select=(type,index=0)=>{ed.inspectorTab='layer';ed.selected={type,index};if(type==='ad'){const pt=ed.point(),event=pt?.range.timed[0];if(event)ed.seek(pt.range.start+event.start+Math.min(event.fade+.1,event.duration/2));}
   ed.renderInspector();ed.paint();if(window.innerWidth<780){const body=document.getElementById('ed-body');body.classList.remove('left-open');body.classList.add('inspector-open');}};
 ed.renderPanels=()=>{ed.renderLeft();ed.renderInspector();document.querySelectorAll('[data-ed-tool]').forEach(el=>el.classList.toggle('active',el.dataset.edTool===ed.tool));};
-ed.modal=html=>{ed.closeModal();const modal=document.createElement('div');modal.className='ed-modal';modal.id='ed-modal';modal.innerHTML=html;modal.onclick=e=>{if(e.target===modal)ed.closeModal();};document.body.appendChild(modal);modal.querySelector('button,input,select,textarea')?.focus();};
-ed.closeModal=()=>{document.getElementById('ed-modal')?.remove();ed.cropDraft=null;};
+ed.modal = html => {
+  ed.closeModal();
+  const trigger = document.activeElement;
+  const modal = document.createElement('dialog');
+  modal.className = 'ed-modal';
+  modal.id = 'ed-modal';
+  modal.innerHTML = html;
+  const heading = modal.querySelector('h2');
+  if (heading) {
+    heading.id = 'ed-modal-title';
+    modal.setAttribute('aria-labelledby', heading.id);
+  }
+  modal.addEventListener('click', event => {
+    if (event.target === modal) ed.closeModal();
+  });
+  modal.addEventListener('cancel', event => {
+    event.preventDefault();
+    ed.closeModal();
+  });
+  document.body.appendChild(modal);
+  modal.returnFocusTo = trigger;
+  modal.showModal();
+};
+ed.closeModal = () => {
+  const modal = document.getElementById('ed-modal');
+  if (modal) {
+    modal.close();
+    modal.remove();
+    if (modal.returnFocusTo?.isConnected) modal.returnFocusTo.focus({ preventScroll: true });
+  }
+  ed.cropDraft = null;
+};
 ed.showProjects=async()=>{try{ed.projects=await ed.api('/projects');ed.modal(`<div class="ed-dialog narrow"><div class="ed-dialog-head"><h2>Мои проекты</h2><button class="ed-button icon" onclick="ed.closeModal()" aria-label="Закрыть">${uiIcon("x-circle-fill")}</button></div>${ed.projects.length?ed.projects.map((p,i)=>`<button class="ed-list-item" onclick="ed.loadProject(ed.projects[${i}].id)">${edEsc(p.name)}<small>${new Date(p.updatedAt).toLocaleString('ru')} · ${edEsc(p.source.name)}</small></button>`).join(''):'<p class="ed-small">Импортируй видео, чтобы создать первый проект.</p>'}</div>`);}catch(error){ed.error(error);}};
 ed.newProject=()=>{if(ed.project)ed.useVideo(ed.project.source.videoId);else ed.setTool('media');};
 ed.video.addEventListener('loadedmetadata',()=>{ed.syncMedia(true);ed.paint();});ed.video.addEventListener('seeked',()=>{ed.paint();if(ed.cropDraft)ed.drawCrop();});ed.video.addEventListener('loadeddata',ed.paint);ed.adVideo.addEventListener('seeked',ed.paint);ed.adVideo.addEventListener('loadeddata',ed.paint);
